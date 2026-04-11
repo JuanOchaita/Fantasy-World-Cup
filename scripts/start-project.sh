@@ -45,7 +45,8 @@ HEALTH_CHECK=$(curl -s http://localhost:8080/health || echo "fail")
 if [[ "$HEALTH_CHECK" == *"ok"* ]]; then
   echo "--- PROYECTO LISTO ---"
   echo "Servidor Go corriendo (PID: $SERVER_PID)"
-  echo "Endpoint: http://localhost:8080"
+  echo "Frontend UI: http://localhost:8080/web"
+  echo "API Base:    http://localhost:8080/api/v1"
 else
   echo "--- ERROR: El servidor no respondio ---"
   echo "Revisa server.log para más detalles:"
