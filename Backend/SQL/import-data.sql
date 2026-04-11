@@ -113,7 +113,7 @@ CREATE TEMP TABLE tmp_players (
 );
 
 COPY tmp_players
-FROM '/Players.csv'
+FROM '/docker-entrypoint-initdb.d/players.csv'
 DELIMITER ','
 CSV HEADER
 NULL '';
