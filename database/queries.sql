@@ -41,6 +41,16 @@ SET budget_used = $2
 WHERE squad_id = $1
 RETURNING *;
 
+-- name: UpdateSquadFormation :one
+UPDATE squad
+SET formation = $2
+WHERE squad_id = $1
+RETURNING *;
+
+-- name: CountPlayersInSquad :one
+SELECT COUNT(*) FROM squad_player
+WHERE squad_id = $1;
+
 -- name: AddPlayerToSquad :exec
 INSERT INTO squad_player (squad_id, player_id, position_slot)
 VALUES ($1, $2, $3);
