@@ -132,7 +132,8 @@ CREATE TABLE squad (
     squad_name VARCHAR(50) NOT NULL,
     formation VARCHAR(10),
     budget_used BIGINT DEFAULT 0 CHECK (budget_used >= 0),
-    total_points INT DEFAULT 0 CHECK (total_points >= 0)
+    total_points INT DEFAULT 0 CHECK (total_points >= 0),
+    UNIQUE (user_id) -- agregado para el leader board -- 
 
 );
 
@@ -156,3 +157,78 @@ ADD CONSTRAINT fk_squadplayer_player FOREIGN KEY (player_id) REFERENCES players(
 
 ALTER TABLE squad_player
 ADD CONSTRAINT unique_squad_player UNIQUE (squad_id, player_id);
+
+
+-- =========================================================
+-- BEGIN FEATURE 4: Scoring, Leaderboard & Ranking support
+-- =========================================================
+
+-- NOTE:
+-- Some SQL editors (like VS Code SQL extension) may show syntax errors
+-- for "IF NOT EXISTS". This syntax is valid in PostgreSQL.
+-- If needed, remove "IF NOT EXISTS" to silence editor warnings.
+
+ALTER TABLE squad
+ADD CONSTRAINT uq_squad_user UNIQUE (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_squad_user_id
+    ON squad (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_squad_player_squad_id
+    ON squad_player (squad_id);
+
+CREATE INDEX IF NOT EXISTS idx_squad_player_player_id
+    ON squad_player (player_id);
+
+CREATE INDEX IF NOT EXISTS idx_players_nation_team_id
+    ON players (nation_team_id);
+
+CREATE INDEX IF NOT EXISTS idx_players_nationality_name
+    ON players (nationality_name);
+
+CREATE TABLE IF NOT EXISTS matches (
+    match_id SERIAL PRIMARY KEY,
+    team_a VARCHAR(100) NOT NULL,
+    team_b VARCHAR(100) NOT NULL,
+    score_a SMALLINT NOT NULL CHECK (score_a >= 0),
+    score_b SMALLINT NOT NULL CHECK (score_b >= 0),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS match_user_points (
+    match_user_points_id SERIAL PRIMARY KEY,
+    match_id INT NOT NULL REFERENCES matches(match_id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    points_earned INT NOT NULL CHECK (points_earned >= 0),
+    total_points_after_match INT NOT NULL CHECK (total_points_after_match >= 0),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (match_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS match_user_player_points (
+    match_user_player_points_id SERIAL PRIMARY KEY,
+    match_id INT NOT NULL REFERENCES matches(match_id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    player_id INT NOT NULL REFERENCES players(player_id) ON DELETE CASCADE,
+    points_earned INT NOT NULL CHECK (points_earned >= 0),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_match_user_points_user_id
+    ON match_user_points (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_match_user_points_match_id
+    ON match_user_points (match_id);
+
+CREATE INDEX IF NOT EXISTS idx_match_user_player_points_user_id
+    ON match_user_player_points (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_match_user_player_points_match_id
+    ON match_user_player_points (match_id);
+
+CREATE INDEX IF NOT EXISTS idx_match_user_player_points_player_id
+    ON match_user_player_points (player_id);
+
+-- =========================================================
+-- END FEATURE 4: Scoring, Leaderboard & Ranking support
+-- =========================================================
