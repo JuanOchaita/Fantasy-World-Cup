@@ -37,17 +37,17 @@ docker exec -i db-lab-postgres psql -U admin -d labdb < schema.sql
 4. Copy Data Files into Container
 
 ```bash
-docker cp ImportData.sql db-lab-postgres:/ImportData.sql
+docker cp import-data.sql db-lab-postgres:/import-data.sql
 ```
 
 ```bash
-docker cp Players.csv db-lab-postgres:/Players.csv
+docker cp players.csv db-lab-postgres:/players.csv
 ```
 
  5. Import Data: Run the import script inside the container:
 
 ```bash
-docker exec -i db-lab-postgres psql -U admin -d labdb < ImportData.sql
+docker exec -i db-lab-postgres psql -U admin -d labdb < import-data.sql
 ```
 
 6. Access the Database: Open an interactive PostgreSQL session:

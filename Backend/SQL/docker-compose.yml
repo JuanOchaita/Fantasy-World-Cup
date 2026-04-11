@@ -1,14 +1,11 @@
 version: '3.9'
 
-# This docker-compose file sets up a complete learning environment for:
-# - PostgreSQL: Powerful open-source relational database system
-
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: db-lab-postgres
     ports:
-    - "5433:5432"
+      - "5433:5432"
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
@@ -23,12 +20,10 @@ services:
       timeout: 3s
       retries: 5
 
-# Shared network for inter-service communication
 networks:
   db-lab-net:
     driver: bridge
 
-# Named volumes for data persistence
 volumes:
   postgres-data:
     driver: local
