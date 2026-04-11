@@ -15,6 +15,9 @@ services:
       POSTGRES_DB: labdb
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+      - ./import-data.sql:/docker-entrypoint-initdb.d/2-import-data.sql
+      - ./players.csv:/docker-entrypoint-initdb.d/players.csv
     networks:
       - db-lab-net
     healthcheck:

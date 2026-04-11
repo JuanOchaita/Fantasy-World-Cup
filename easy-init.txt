@@ -1,0 +1,18 @@
+FANTASY WORLD CUP - GUIA DE INICIO RAPIDO
+
+1. Requisitos:
+- Docker y Docker Compose instalados.
+
+2. Levantar Base de Datos:
+Ejecutar el script de inicializacion automatica:
+./setup-db.sh
+
+3. Detener Base de Datos:
+docker compose -f Backend/SQL/docker-compose.yml down -v
+
+4. Datos de Conexion:
+- Host: localhost
+- Puerto: 5433
+- Usuario: admin
+- Password: admin
+- Database: labdb
