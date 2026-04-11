@@ -1,0 +1,33 @@
+# Binarios
+server
+server.exe
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Variables de entorno
+.env
+
+# Logs
+server.log
+*.log
+
+# Docker
+.docker/
+postgres-data/
+
+# Go
+vendor/
+go.sum
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
