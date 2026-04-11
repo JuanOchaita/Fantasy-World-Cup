@@ -1,5 +1,3 @@
-version: '3.9'
-
 # This docker-compose file sets up a complete learning environment for:
 # - PostgreSQL: Powerful open-source relational database system
 
