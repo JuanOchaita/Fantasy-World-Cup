@@ -49,6 +49,19 @@
             <button onclick="getLeaderboard()">Actualizar Ranking</button>
             <ul id="leaderboard-list"></ul>
         </section>
+
+        <!-- Admin Section -->
+        <section id="admin-section">
+            <h2 style="color: var(--primary);">PANEL DEL PROFESOR (Simulado Admin)</h2>
+            <div class="actions">
+                <input type="number" id="nation-a-id" placeholder="ID Nacion A">
+                <input type="number" id="nation-b-id" placeholder="ID Nacion B">
+                <input type="number" id="score-a" placeholder="Goles A">
+                <input type="number" id="score-b" placeholder="Goles B">
+                <button onclick="postMatchResult()">Postear Resultado</button>
+            </div>
+            <p><small>Puntos: Victoria +3, Empate +1, Derrota 0.</small></p>
+        </section>
     </main>
 
     <script src="app.js"></script>

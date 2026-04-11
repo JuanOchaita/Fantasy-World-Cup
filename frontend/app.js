@@ -124,3 +124,22 @@ async function getLeaderboard() {
         list.appendChild(li);
     });
 }
+
+async function postMatchResult() {
+    const nationAID = parseInt(document.getElementById('nation-a-id').value);
+    const nationBID = parseInt(document.getElementById('nation-b-id').value);
+    const scoreA = parseInt(document.getElementById('score-a').value);
+    const scoreB = parseInt(document.getElementById('score-b').value);
+
+    const res = await fetch(`${API_URL}/admin/results`, {
+        method: 'POST',
+        headers: { 
+            'Authorization': `Bearer ${TOKEN}`,
+            'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({ nation_a_id: nationAID, nation_b_id: nationBID, score_a: scoreA, score_b: scoreB })
+    });
+    const data = await res.json();
+    alert(data.message || data.error);
+    getLeaderboard();
+}
