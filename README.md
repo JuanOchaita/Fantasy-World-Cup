@@ -35,6 +35,14 @@ Todos los scripts se encuentran en la carpeta `/scripts`:
 - `stop-project.sh`: Detiene el servidor Go y la infraestructura Docker de forma limpia.
 - `run-tests.sh`: Ejecuta la suite de pruebas unitarias y de integración de Go.
 
+## Colaboración entre Equipos
+
+Para facilitar la integración del sistema políglota, se han creado guías específicas para cada equipo:
+
+- **[Equipo de Search DB](./instrucciones/guia-search-db.md)**: Integración de Meilisearch/Elasticsearch para búsqueda difusa.
+- **[Equipo de Dashboard DB](./instrucciones/guia-dashboard-db.md)**: Uso de Redis para Leaderboard y sesiones.
+- **[Equipo de UI/UX (Frontend)](./instrucciones/guia-ui-ux.md)**: Contrato de API y flujo de usuario.
+
 ## Endpoints Principales (API v1)
 
 ### Autenticación
