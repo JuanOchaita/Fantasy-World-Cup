@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy World Cup 2026 - Test Bench</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>FANTASY WORLD CUP 2026</h1>
+        <div id="auth-status">No autenticado</div>
+    </header>
+
+    <main>
+        <!-- Auth Section -->
+        <section id="auth-section">
+            <h2>Registro / Login</h2>
+            <input type="email" id="email" placeholder="Email">
+            <input type="text" id="username" placeholder="Usuario (solo registro)">
+            <input type="password" id="password" placeholder="Contraseña">
+            <div class="actions">
+                <button onclick="register()">Registrar</button>
+                <button onclick="login()">Login</button>
+            </div>
+        </section>
+
+        <!-- Search Section -->
+        <section id="search-section" class="hidden">
+            <h2>Buscador de Jugadores</h2>
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="Nombre del jugador..." oninput="searchPlayers()">
+            </div>
+            <div id="player-results" class="grid"></div>
+        </section>
+
+        <!-- Squad Section -->
+        <section id="squad-section" class="hidden">
+            <h2>Tu Escuadra: <span id="squad-name-display"></span></h2>
+            <div id="squad-info">
+                Presupuesto Usado: $<span id="budget-used">0</span>M / $100M | Puntos: <span id="squad-points">0</span>
+            </div>
+            <div id="squad-list" class="grid"></div>
+        </section>
+
+        <!-- Leaderboard Section -->
+        <section id="leaderboard-section">
+            <h2>Leaderboard Global (Redis)</h2>
+            <button onclick="getLeaderboard()">Actualizar Ranking</button>
+            <ul id="leaderboard-list"></ul>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
