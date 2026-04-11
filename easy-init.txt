@@ -1,18 +1,24 @@
-FANTASY WORLD CUP - GUIA DE INICIO RAPIDO
+FANTASY WORLD CUP - INICIO RAPIDO (ARQUITECTURA REESTRUCTURADA)
 
 1. Requisitos:
-- Docker y Docker Compose instalados.
+- Docker y Docker Compose.
+- Go (Instalado automaticamente en ~/go_dist).
 
-2. Levantar Base de Datos:
-Ejecutar el script de inicializacion automatica:
-./setup-db.sh
+2. Iniciar Proyecto Completo (Infraestructura + Backend):
+Ejecuta el script de automatizacion integral:
+./start-project.sh
 
-3. Detener Base de Datos:
-docker compose -f Backend/SQL/docker-compose.yml down -v
+3. Detener Todo:
+docker compose down -v && fuser -k 8080/tcp
 
 4. Datos de Conexion:
-- Host: localhost
-- Puerto: 5433
-- Usuario: admin
-- Password: admin
-- Database: labdb
+- Host: 127.0.0.1
+- Puerto DB (Postgres): 5433
+- Puerto Cache (Redis): 6379
+- Puerto API (Go): 8080
+
+Estructura:
+/database  -> Scripts SQL, CSV y Documentacion DB.
+/cmd       -> Punto de entrada del servidor.
+/internal  -> Logica de negocio (Repository, Service, Handler).
+/pkg       -> Utilidades compartidas.
