@@ -20,7 +20,6 @@ postgres-data/
 
 # Go
 vendor/
-go.sum
 
 # IDEs
 .vscode/
