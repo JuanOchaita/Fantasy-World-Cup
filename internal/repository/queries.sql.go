@@ -45,6 +45,18 @@ func (q *Queries) CountPlayersFromNationInSquad(ctx context.Context, arg CountPl
 	return count, err
 }
 
+const countPlayersInSquad = `-- name: CountPlayersInSquad :one
+SELECT COUNT(*) FROM squad_player
+WHERE squad_id = $1
+`
+
+func (q *Queries) CountPlayersInSquad(ctx context.Context, squadID int32) (int64, error) {
+	row := q.queryRow(ctx, q.countPlayersInSquadStmt, countPlayersInSquad, squadID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createSquad = `-- name: CreateSquad :one
 INSERT INTO squad (user_id, squad_name, formation, budget_used)
 VALUES ($1, $2, $3, $4)
@@ -558,6 +570,23 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	return i, err
 }
 
+const getUserByID = `-- name: GetUserByID :one
+SELECT user_id, username, email, password_hash FROM users
+WHERE user_id = $1 LIMIT 1
+`
+
+func (q *Queries) GetUserByID(ctx context.Context, userID int32) (User, error) {
+	row := q.queryRow(ctx, q.getUserByIDStmt, getUserByID, userID)
+	var i User
+	err := row.Scan(
+		&i.UserID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+	)
+	return i, err
+}
+
 const getUserByUsername = `-- name: GetUserByUsername :one
 SELECT user_id, username, email, password_hash FROM users
 WHERE username = $1 LIMIT 1
@@ -920,6 +949,32 @@ type UpdateSquadBudgetParams struct {
 
 func (q *Queries) UpdateSquadBudget(ctx context.Context, arg UpdateSquadBudgetParams) (Squad, error) {
 	row := q.queryRow(ctx, q.updateSquadBudgetStmt, updateSquadBudget, arg.SquadID, arg.BudgetUsed)
+	var i Squad
+	err := row.Scan(
+		&i.SquadID,
+		&i.UserID,
+		&i.SquadName,
+		&i.Formation,
+		&i.BudgetUsed,
+		&i.TotalPoints,
+	)
+	return i, err
+}
+
+const updateSquadFormation = `-- name: UpdateSquadFormation :one
+UPDATE squad
+SET formation = $2
+WHERE squad_id = $1
+RETURNING squad_id, user_id, squad_name, formation, budget_used, total_points
+`
+
+type UpdateSquadFormationParams struct {
+	SquadID   int32          `json:"squad_id"`
+	Formation sql.NullString `json:"formation"`
+}
+
+func (q *Queries) UpdateSquadFormation(ctx context.Context, arg UpdateSquadFormationParams) (Squad, error) {
+	row := q.queryRow(ctx, q.updateSquadFormationStmt, updateSquadFormation, arg.SquadID, arg.Formation)
 	var i Squad
 	err := row.Scan(
 		&i.SquadID,

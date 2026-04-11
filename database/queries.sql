@@ -26,6 +26,10 @@ WHERE email = $1 LIMIT 1;
 SELECT * FROM users
 WHERE username = $1 LIMIT 1;
 
+-- name: GetUserByID :one
+SELECT * FROM users
+WHERE user_id = $1 LIMIT 1;
+
 -- name: CreateSquad :one
 INSERT INTO squad (user_id, squad_name, formation, budget_used)
 VALUES ($1, $2, $3, $4)

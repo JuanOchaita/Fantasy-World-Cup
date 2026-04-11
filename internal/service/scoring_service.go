@@ -83,7 +83,6 @@ func (s *ScoringService) SyncLeaderboardToRedis(ctx context.Context) error {
 	_, err = pipe.Exec(ctx)
 	return err
 }
-
 func (s *ScoringService) GetLeaderboard(ctx context.Context, start, stop int64) ([]redis.Z, error) {
 	res, err := s.rdb.ZRevRangeWithScores(ctx, LeaderboardKey, start, stop).Result()
 	if err != nil || len(res) == 0 {
@@ -93,3 +92,33 @@ func (s *ScoringService) GetLeaderboard(ctx context.Context, start, stop int64) 
 	}
 	return res, nil
 }
+
+type UserRank struct {
+	Username  string  `json:"username"`
+	SquadName string  `json:"squad_name"`
+	Rank      int64   `json:"rank"`
+	Score     float64 `json:"score"`
+}
+
+func (s *ScoringService) GetUserRank(ctx context.Context, username, squadName string) (UserRank, error) {
+	member := fmt.Sprintf("%s|%s", username, squadName)
+
+	// ZREVRANK es 0-based, sumamos 1 para el puesto real
+	rank, err := s.rdb.ZRevRank(ctx, LeaderboardKey, member).Result()
+	if err != nil {
+		return UserRank{}, err
+	}
+
+	score, err := s.rdb.ZScore(ctx, LeaderboardKey, member).Result()
+	if err != nil {
+		return UserRank{}, err
+	}
+
+	return UserRank{
+		Username:  username,
+		SquadName: squadName,
+		Rank:      rank + 1,
+		Score:     score,
+	}, nil
+}
+

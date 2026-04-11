@@ -30,6 +30,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.countPlayersFromNationInSquadStmt, err = db.PrepareContext(ctx, countPlayersFromNationInSquad); err != nil {
 		return nil, fmt.Errorf("error preparing query CountPlayersFromNationInSquad: %w", err)
 	}
+	if q.countPlayersInSquadStmt, err = db.PrepareContext(ctx, countPlayersInSquad); err != nil {
+		return nil, fmt.Errorf("error preparing query CountPlayersInSquad: %w", err)
+	}
 	if q.createSquadStmt, err = db.PrepareContext(ctx, createSquad); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateSquad: %w", err)
 	}
@@ -51,6 +54,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getUserByEmailStmt, err = db.PrepareContext(ctx, getUserByEmail); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByEmail: %w", err)
 	}
+	if q.getUserByIDStmt, err = db.PrepareContext(ctx, getUserByID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUserByID: %w", err)
+	}
 	if q.getUserByUsernameStmt, err = db.PrepareContext(ctx, getUserByUsername); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByUsername: %w", err)
 	}
@@ -69,6 +75,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateSquadBudgetStmt, err = db.PrepareContext(ctx, updateSquadBudget); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateSquadBudget: %w", err)
 	}
+	if q.updateSquadFormationStmt, err = db.PrepareContext(ctx, updateSquadFormation); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateSquadFormation: %w", err)
+	}
 	return &q, nil
 }
 
@@ -82,6 +91,11 @@ func (q *Queries) Close() error {
 	if q.countPlayersFromNationInSquadStmt != nil {
 		if cerr := q.countPlayersFromNationInSquadStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countPlayersFromNationInSquadStmt: %w", cerr)
+		}
+	}
+	if q.countPlayersInSquadStmt != nil {
+		if cerr := q.countPlayersInSquadStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countPlayersInSquadStmt: %w", cerr)
 		}
 	}
 	if q.createSquadStmt != nil {
@@ -119,6 +133,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getUserByEmailStmt: %w", cerr)
 		}
 	}
+	if q.getUserByIDStmt != nil {
+		if cerr := q.getUserByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUserByIDStmt: %w", cerr)
+		}
+	}
 	if q.getUserByUsernameStmt != nil {
 		if cerr := q.getUserByUsernameStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getUserByUsernameStmt: %w", cerr)
@@ -147,6 +166,11 @@ func (q *Queries) Close() error {
 	if q.updateSquadBudgetStmt != nil {
 		if cerr := q.updateSquadBudgetStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateSquadBudgetStmt: %w", cerr)
+		}
+	}
+	if q.updateSquadFormationStmt != nil {
+		if cerr := q.updateSquadFormationStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateSquadFormationStmt: %w", cerr)
 		}
 	}
 	return err
@@ -190,6 +214,7 @@ type Queries struct {
 	tx                                *sql.Tx
 	addPlayerToSquadStmt              *sql.Stmt
 	countPlayersFromNationInSquadStmt *sql.Stmt
+	countPlayersInSquadStmt           *sql.Stmt
 	createSquadStmt                   *sql.Stmt
 	createUserStmt                    *sql.Stmt
 	getLeaderboardStmt                *sql.Stmt
@@ -197,12 +222,14 @@ type Queries struct {
 	getSquadByUserIDStmt              *sql.Stmt
 	getSquadPlayersStmt               *sql.Stmt
 	getUserByEmailStmt                *sql.Stmt
+	getUserByIDStmt                   *sql.Stmt
 	getUserByUsernameStmt             *sql.Stmt
 	listPlayersStmt                   *sql.Stmt
 	removePlayerFromSquadStmt         *sql.Stmt
 	searchPlayersStmt                 *sql.Stmt
 	updatePointsForNationStmt         *sql.Stmt
 	updateSquadBudgetStmt             *sql.Stmt
+	updateSquadFormationStmt          *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
@@ -211,6 +238,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		tx:                                tx,
 		addPlayerToSquadStmt:              q.addPlayerToSquadStmt,
 		countPlayersFromNationInSquadStmt: q.countPlayersFromNationInSquadStmt,
+		countPlayersInSquadStmt:           q.countPlayersInSquadStmt,
 		createSquadStmt:                   q.createSquadStmt,
 		createUserStmt:                    q.createUserStmt,
 		getLeaderboardStmt:                q.getLeaderboardStmt,
@@ -218,11 +246,13 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getSquadByUserIDStmt:              q.getSquadByUserIDStmt,
 		getSquadPlayersStmt:               q.getSquadPlayersStmt,
 		getUserByEmailStmt:                q.getUserByEmailStmt,
+		getUserByIDStmt:                   q.getUserByIDStmt,
 		getUserByUsernameStmt:             q.getUserByUsernameStmt,
 		listPlayersStmt:                   q.listPlayersStmt,
 		removePlayerFromSquadStmt:         q.removePlayerFromSquadStmt,
 		searchPlayersStmt:                 q.searchPlayersStmt,
 		updatePointsForNationStmt:         q.updatePointsForNationStmt,
 		updateSquadBudgetStmt:             q.updateSquadBudgetStmt,
+		updateSquadFormationStmt:          q.updateSquadFormationStmt,
 	}
 }

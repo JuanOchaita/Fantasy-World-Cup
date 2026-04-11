@@ -4,16 +4,18 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/delta/fantasy-world-cup/internal/repository"
 	"github.com/delta/fantasy-world-cup/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
 type ScoringHandler struct {
 	scoringService *service.ScoringService
+	repo           *repository.Queries
 }
 
-func NewScoringHandler(scoringService *service.ScoringService) *ScoringHandler {
-	return &ScoringHandler{scoringService: scoringService}
+func NewScoringHandler(scoringService *service.ScoringService, repo *repository.Queries) *ScoringHandler {
+	return &ScoringHandler{scoringService: scoringService, repo: repo}
 }
 
 type matchResultRequest struct {
@@ -46,6 +48,39 @@ func (h *ScoringHandler) GetLeaderboard(c *gin.Context) {
 	res, err := h.scoringService.GetLeaderboard(c.Request.Context(), 0, limit-1)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error al obtener leaderboard"})
+		return
+	}
+
+	c.JSON(http.StatusOK, res)
+}
+
+func (h *ScoringHandler) GetMyRank(c *gin.Context) {
+	userID := c.MustGet("user_id").(int32)
+
+	// 1. Obtener datos de escuadra
+	squad, err := h.repo.GetSquadByUserID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "escuadra no encontrada"})
+		return
+	}
+
+	// 2. Obtener datos de usuario
+	user, err := h.repo.GetUserByID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error al obtener datos de usuario"})
+		return
+	}
+
+	// 3. Consultar Redis para el ranking
+	res, err := h.scoringService.GetUserRank(c.Request.Context(), user.Username, squad.SquadName)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"username":   user.Username,
+			"squad_name": squad.SquadName,
+			"rank":       "N/A",
+			"score":      squad.TotalPoints.Int32,
+			"message":    "aun no estas en el ranking de Redis (sincronizando...)",
+		})
 		return
 	}
 
