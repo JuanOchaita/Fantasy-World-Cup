@@ -5,7 +5,7 @@ version: '3.9'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: db-lab-postgres
     ports:
     - "5433:5432"
@@ -14,14 +14,27 @@ services:
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: labdb
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
-      - ./import-data.sql:/docker-entrypoint-initdb.d/2-import-data.sql
-      - ./players.csv:/docker-entrypoint-initdb.d/players.csv
+      - postgres-data:/var/lib/postgresql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+      - ./database/import-data.sql:/docker-entrypoint-initdb.d/2-import-data.sql
+      - ./database/players.csv:/docker-entrypoint-initdb.d/players.csv
     networks:
       - db-lab-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d labdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: db-lab-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - db-lab-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
