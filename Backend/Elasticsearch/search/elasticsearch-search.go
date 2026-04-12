@@ -8,9 +8,15 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 var (
@@ -35,6 +41,31 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// normalize removes diacritics and lowercases — allows "rolando" to match "Rólando".
+func normalize(s string) string {
+	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+	result, _, _ := transform.String(t, s)
+	return strings.ToLower(result)
+}
+
+// relevanceGroup classifies a hit into one of three tiers:
+//
+//	0 → name starts with query   (highest — like Google autocomplete prefix)
+//	1 → name contains query but doesn't start with it
+//	2 → other fuzzy / ngram match
+func relevanceGroup(name, qNorm string) int {
+	nameNorm := normalize(name)
+	if strings.HasPrefix(nameNorm, qNorm) {
+		return 0
+	}
+	// Check every word boundary: "Lautaro Rolando" contains "rolando" as a whole word.
+	// We split on spaces and also check plain Contains for substring matches.
+	if strings.Contains(nameNorm, qNorm) {
+		return 1
+	}
+	return 2
 }
 
 func buildQuery(q string, size int) map[string]any {
@@ -101,53 +132,25 @@ func buildQuery(q string, size int) map[string]any {
 		)
 	}
 
-	baseQuery := map[string]any{
-		"bool": map[string]any{
-			"should":               should,
-			"minimum_should_match": 1,
-		},
-	}
-
 	return map[string]any{
 		"query": map[string]any{
-			"function_score": map[string]any{
-				"query": baseQuery,
-				"functions": []any{
-					map[string]any{
-						"filter": map[string]any{
-							"prefix": map[string]any{
-								"long_name.keyword": map[string]any{
-									"value":            q,
-									"case_insensitive": true,
-								},
-							},
-						},
-						"weight": 1000,
-					},
-					map[string]any{
-						"filter": map[string]any{
-							"match_phrase": map[string]any{
-								"long_name": q,
-							},
-						},
-						"weight": 500,
-					},
-					map[string]any{
-						"field_value_factor": map[string]any{
-							"field":    "overall",
-							"factor":   0.1,
-							"modifier": "none",
-							"missing":  0,
-						},
-					},
-				},
-				"score_mode": "sum",
-				"boost_mode": "sum",
+			"bool": map[string]any{
+				"should":               should,
+				"minimum_should_match": 1,
 			},
 		},
-		"size":    size,
+		// Fetch more from ES so re-ranking has enough candidates even when
+		// the top-N by score don't cover all starts-with results.
+		"size":    size * 3,
 		"_source": true,
 	}
+}
+
+type hit struct {
+	source map[string]any
+	group  int
+	// overall is the player's overall rating, used as a tiebreaker within a group.
+	overall float64
 }
 
 func searchPlayers(w http.ResponseWriter, r *http.Request) {
@@ -219,19 +222,56 @@ func searchPlayers(w http.ResponseWriter, r *http.Request) {
 	innerHits, _ := hits["hits"].([]any)
 	total, _ := hits["total"].(map[string]any)
 
-	results := make([]map[string]any, 0, len(innerHits))
+	qNorm := normalize(q)
+
+	// Build intermediate slice with group + overall for sorting.
+	ranked := make([]hit, 0, len(innerHits))
 	for _, h := range innerHits {
-		hit, ok := h.(map[string]any)
+		esHit, ok := h.(map[string]any)
 		if !ok {
 			continue
 		}
-		source, _ := hit["_source"].(map[string]any)
+		source, _ := esHit["_source"].(map[string]any)
 		if source == nil {
 			source = map[string]any{}
 		}
-		source["_id"] = hit["_id"]
-		source["_score"] = hit["_score"]
-		results = append(results, source)
+		source["_id"] = esHit["_id"]
+		source["_score"] = esHit["_score"]
+
+		name, _ := source["long_name"].(string)
+		group := relevanceGroup(name, qNorm)
+
+		var overall float64
+		switch v := source["overall"].(type) {
+		case float64:
+			overall = v
+		case int:
+			overall = float64(v)
+		}
+
+		ranked = append(ranked, hit{
+			source:  source,
+			group:   group,
+			overall: overall,
+		})
+	}
+
+	// Sort: primary = group ASC (0 best), secondary = overall DESC (higher is better).
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].group != ranked[j].group {
+			return ranked[i].group < ranked[j].group
+		}
+		return ranked[i].overall > ranked[j].overall
+	})
+
+	// Trim to requested size.
+	if len(ranked) > size {
+		ranked = ranked[:size]
+	}
+
+	results := make([]map[string]any, 0, len(ranked))
+	for _, r := range ranked {
+		results = append(results, r.source)
 	}
 
 	elapsed := time.Since(start).Milliseconds()

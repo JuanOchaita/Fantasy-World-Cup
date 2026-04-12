@@ -94,6 +94,7 @@ func createIndex() error {
 						},
 					},
 				},
+				// overall stored as integer for sorting within tie-break groups
 				"overall": map[string]any{
 					"type": "integer",
 				},
@@ -200,8 +201,11 @@ func main() {
 		log.Fatalf("failed to setup index: %v", err)
 	}
 
-	rows, err := db.QueryContext(context.Background(),
-		"SELECT long_name::text, overall FROM players WHERE long_name IS NOT NULL AND long_name != ''")
+	// Now also fetching overall for tiebreaking within same relevance group
+	rows, err := db.QueryContext(
+		context.Background(),
+		"SELECT long_name::text, COALESCE(overall, 0) FROM players WHERE long_name IS NOT NULL AND long_name != ''",
+	)
 	if err != nil {
 		log.Fatalf("failed to query players: %v", err)
 	}
