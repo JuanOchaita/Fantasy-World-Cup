@@ -109,7 +109,7 @@ func (s *ScoringService) ProcessMatchResult(
 		}
 	}
 
-	// Actualiza el total acumulado por squad usando la lógica ya existente.
+	// Mantiene la lógica ya existente para actualizar los puntos acumulados.
 	if pointsA > 0 {
 		if err := s.repo.UpdatePointsForNation(ctx, repository.UpdatePointsForNationParams{
 			PlayerID:      pointsA,
@@ -272,6 +272,13 @@ func (s *ScoringService) SyncLeaderboardToRedis(ctx context.Context) error {
 	return nil
 }
 
+func (s *ScoringService) syncLeaderboardOrFail(ctx context.Context) error {
+	if err := s.SyncLeaderboardToRedis(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *ScoringService) GetLeaderboard(ctx context.Context, start, stop int64) ([]redis.Z, error) {
 	res, err := s.rdb.ZRevRangeWithScores(ctx, LeaderboardKey, start, stop).Result()
 	if err == nil && len(res) > 0 {
@@ -280,7 +287,7 @@ func (s *ScoringService) GetLeaderboard(ctx context.Context, start, stop int64) 
 
 	log.Println("Leaderboard no encontrado en Redis, sincronizando desde PostgreSQL...")
 
-	if syncErr := s.SyncLeaderboardToRedis(ctx); syncErr != nil {
+	if syncErr := s.syncLeaderboardOrFail(ctx); syncErr != nil {
 		return nil, syncErr
 	}
 
@@ -294,7 +301,7 @@ func (s *ScoringService) GetUserRank(ctx context.Context, username, squadName st
 	if err != nil {
 		log.Println("Rank no encontrado en Redis, sincronizando desde PostgreSQL...")
 
-		if syncErr := s.SyncLeaderboardToRedis(ctx); syncErr != nil {
+		if syncErr := s.syncLeaderboardOrFail(ctx); syncErr != nil {
 			return UserRank{}, syncErr
 		}
 
@@ -306,7 +313,7 @@ func (s *ScoringService) GetUserRank(ctx context.Context, username, squadName st
 
 	score, err := s.rdb.ZScore(ctx, LeaderboardKey, member).Result()
 	if err != nil {
-		if syncErr := s.SyncLeaderboardToRedis(ctx); syncErr != nil {
+		if syncErr := s.syncLeaderboardOrFail(ctx); syncErr != nil {
 			return UserRank{}, syncErr
 		}
 
