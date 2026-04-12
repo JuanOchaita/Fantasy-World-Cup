@@ -14,7 +14,6 @@ if [ ! -f cmd/server/main.go ]; then
 package main
 
 import (
-	"log"
 	"os"
 
 	"github.com/delta/fantasy-world-cup/internal/handler"
@@ -38,11 +37,14 @@ func CORSMiddleware() gin.HandlerFunc {
 
 func main() {
 	godotenv.Load()
-	port := os.Getenv("PORT"); if port == "" { port = "8080" }
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 	conn := utils.ConnectDB()
 	defer conn.Postgres.Close()
 	q := repository.New(conn.Postgres)
-	
+
 	r := gin.Default()
 	r.Use(CORSMiddleware())
 	r.StaticFile("/web", "./frontend/index.html")
@@ -69,5 +71,4 @@ func main() {
 EOF
 fi
 
-if command -v sqlc >/dev/null 2>&1; then sqlc generate; else $HOME/go_dist/go/bin/sqlc generate; fi
 echo "✅ Configuración finalizada."
