@@ -174,9 +174,13 @@ func main() {
 	inserted, updated, errors := 0, 0, 0
 
 	for prefix, entries := range prefixMap {
-		// 1. Ordenar únicamente por overall descendente.
-		//    sort.SliceStable preserva el orden de llegada ante empate de overall.
+		// 1. Ordenar por score descendente; desempate por overall descendente.
+		//    sort.SliceStable preserva el orden de llegada ante empate total.
 		sort.SliceStable(entries, func(i, j int) bool {
+			si, sj := entries[i].score(), entries[j].score()
+			if si != sj {
+				return si > sj
+			}
 			return entries[i].Overall > entries[j].Overall
 		})
 
