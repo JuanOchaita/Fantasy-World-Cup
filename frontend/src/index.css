@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Oswald:wght@400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 160 40% 4%;
+    --foreground: 45 20% 95%;
+
+    --card: 160 35% 8%;
+    --card-foreground: 45 20% 95%;
+
+    --popover: 160 35% 8%;
+    --popover-foreground: 45 20% 95%;
+
+    --primary: 43 56% 52%;
+    --primary-foreground: 160 40% 4%;
+
+    --secondary: 160 30% 14%;
+    --secondary-foreground: 45 20% 90%;
+
+    --muted: 160 20% 12%;
+    --muted-foreground: 160 10% 55%;
+
+    --accent: 160 30% 14%;
+    --accent-foreground: 43 56% 52%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 160 20% 16%;
+    --input: 160 20% 16%;
+    --ring: 43 56% 52%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 160 35% 6%;
+    --sidebar-foreground: 45 20% 90%;
+    --sidebar-primary: 43 56% 52%;
+    --sidebar-primary-foreground: 160 40% 4%;
+    --sidebar-accent: 160 30% 12%;
+    --sidebar-accent-foreground: 45 20% 90%;
+    --sidebar-border: 160 20% 14%;
+    --sidebar-ring: 43 56% 52%;
+
+    /* Custom tokens */
+    --gold: 43 56% 52%;
+    --gold-light: 43 70% 65%;
+    --gold-dark: 43 50% 40%;
+    --pitch: 160 40% 4%;
+    --pitch-light: 160 35% 8%;
+    --pitch-lighter: 160 30% 14%;
+    --glass: 160 30% 12%;
+    --glass-border: 160 20% 20%;
+
+    --gradient-gold: linear-gradient(135deg, hsl(43 56% 52%), hsl(43 70% 65%));
+    --gradient-pitch: linear-gradient(180deg, hsl(160 40% 4%), hsl(160 35% 10%));
+    --gradient-glass: linear-gradient(135deg, hsl(160 30% 12% / 0.6), hsl(160 30% 8% / 0.3));
+
+    --shadow-gold: 0 4px 20px -4px hsl(43 56% 52% / 0.25);
+    --shadow-card: 0 8px 32px -8px hsl(0 0% 0% / 0.4);
+
+    --font-display: 'Oswald', sans-serif;
+    --font-body: 'Inter', sans-serif;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: hsl(var(--glass) / 0.5);
+    backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--glass-border) / 0.3);
+  }
+
+  .glass-card {
+    background: hsl(var(--glass) / 0.4);
+    backdrop-filter: blur(20px);
+    border: 1px solid hsl(var(--glass-border) / 0.2);
+    box-shadow: var(--shadow-card);
+  }
+
+  .text-gold-gradient {
+    background: var(--gradient-gold);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .btn-gold {
+    background: var(--gradient-gold);
+    color: hsl(var(--pitch));
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-family: var(--font-display);
+    box-shadow: var(--shadow-gold);
+    transition: all 0.2s;
+  }
+
+  .btn-gold:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 6px 28px -4px hsl(43 56% 52% / 0.4);
+  }
+
+  .stadium-pattern {
+    background-image:
+      radial-gradient(ellipse 120% 60% at 50% 0%, hsl(160 35% 10% / 0.8) 0%, transparent 70%),
+      repeating-linear-gradient(0deg, transparent, transparent 40px, hsl(160 30% 8% / 0.3) 40px, hsl(160 30% 8% / 0.3) 41px);
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
