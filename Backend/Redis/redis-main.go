@@ -1,7 +1,11 @@
 package main
 
-// Genera un Key-value para todas las combinaciones de prefijos de cada palabra del nombre completo de cada jugador,
-// normaliza los nombres, elimina caracteres no ASCII (japonés, chino, árabe, etc.) y almacena en Redis.
+// Genera un Key-value para todas las combinaciones de prefijos de cada palabra del nombre completo de cada jugador.
+// Normaliza los nombres, elimina caracteres no ASCII y almacena en Redis.
+// Los resultados se ordenan por relevancia estilo Google:
+//   - Exactitud del match  (peso 0.50): prefixLen / wordLen  → 1.0 si el query cubre toda la palabra
+//   - Posición de la palabra (peso 0.35): 1 / (wordPos + 1)  → primer nombre vale más
+//   - Longitud del nombre  (peso 0.15): 1 / len(name)        → nombres cortos suben en empates
 
 import (
 	"context"
@@ -9,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -32,12 +37,28 @@ var (
 	redis_db       = 0
 )
 
-// normalize convierte el nombre a minúsculas, descompone caracteres acentuados
-// (ej: é -> e + ́) y elimina las marcas diacríticas, dejando solo letras ASCII básicas.
+// nameEntry guarda el nombre original y las señales de relevancia para ese prefijo concreto.
+type nameEntry struct {
+	Name        string
+	WordPos     int     // posición de la palabra que generó el match (0 = primer nombre)
+	WordLen     int     // longitud de la palabra completa
+	PrefixLen   int     // longitud del prefijo (= longitud del query que lo generó)
+	NameLen     int     // longitud del nombre completo (para desempate)
+}
+
+// score calcula la relevancia combinada, imitando las señales básicas de Google:
+//   exactitud  (0.50): qué fracción de la palabra cubre el prefijo
+//   posición   (0.35): primer nombre vale más que segundo, etc.
+//   brevedad   (0.15): nombres más cortos suben ante igual relevancia
+func (e nameEntry) score() float64 {
+	exactitud := float64(e.PrefixLen) / float64(e.WordLen)          // [0..1]
+	posicion  := 1.0 / float64(e.WordPos+1)                          // 1, 0.5, 0.33…
+	brevedad  := 1.0 / float64(e.NameLen)                            // más pequeño = más relevante
+	return exactitud*0.50 + posicion*0.35 + brevedad*0.15
+}
+
+// normalize quita acentos/diacríticos y pasa a minúsculas.
 func normalize(s string) string {
-	// Paso 1: Descomponer caracteres Unicode combinados (NFD)
-	// Paso 2: Eliminar las marcas de acento/diacrítico (categoría Mn = Mark, Nonspacing)
-	// Paso 3: Re-encodear a NFC
 	t := transform.Chain(
 		norm.NFD,
 		runes.Remove(runes.In(unicode.Mn)),
@@ -45,27 +66,16 @@ func normalize(s string) string {
 	)
 	result, _, err := transform.String(t, s)
 	if err != nil {
-		// Si falla la transformación, usar el string original
 		result = s
 	}
-
-	// Paso 4: Convertir a minúsculas
-	result = strings.ToLower(result)
-
-	return result
+	return strings.ToLower(result)
 }
 
-// isAllowedRune devuelve true si el rune es una letra ASCII (a-z) o un espacio.
-// Filtra dígitos, caracteres CJK, árabes, etc.
-func isAllowedRune(r rune) bool {
-	return (r >= 'a' && r <= 'z') || r == ' '
-}
-
-// cleanName elimina cualquier carácter que no sea letra ASCII minúscula o espacio.
+// cleanName elimina todo carácter que no sea letra ASCII minúscula o espacio.
 func cleanName(s string) string {
 	var sb strings.Builder
 	for _, r := range s {
-		if isAllowedRune(r) {
+		if (r >= 'a' && r <= 'z') || r == ' ' {
 			sb.WriteRune(r)
 		}
 	}
@@ -109,13 +119,10 @@ func main() {
 	}
 	defer rows.Close()
 
-	// prefixMap acumula en memoria: prefix -> []originalName
-	// Usamos el nombre ORIGINAL (sin normalizar) como valor en Redis,
-	// igual que en el ejemplo del enunciado.
-	prefixMap := make(map[string][]string)
+	// prefixMap: prefix -> []nameEntry con todas las señales de relevancia
+	prefixMap := make(map[string][]nameEntry)
 
-	processed := 0
-	skipped := 0
+	processed, skipped := 0, 0
 
 	for rows.Next() {
 		var originalName string
@@ -124,24 +131,28 @@ func main() {
 			continue
 		}
 
-		// 1. Normalizar: quitar acentos y pasar a minúsculas
 		normalizedName := normalize(originalName)
+		cleanedName    := cleanName(normalizedName)
+		parts          := strings.Fields(cleanedName)
 
-		// 2. Limpiar: eliminar caracteres no ASCII-alpha (CJK, árabe, dígitos, etc.)
-		cleanedName := cleanName(normalizedName)
-
-		// 3. Dividir por espacios
-		parts := strings.Fields(cleanedName)
 		if len(parts) == 0 {
 			skipped++
 			continue
 		}
 
-		// 4. Generar todas las combinaciones de prefijos por cada palabra
-		for _, word := range parts {
-			for i := 1; i <= len(word); i++ {
-				prefix := word[:i]
-				prefixMap[prefix] = append(prefixMap[prefix], originalName)
+		nameLen := len(originalName)
+
+		for wordPos, word := range parts {
+			wordLen := len(word)
+			for prefixLen := 1; prefixLen <= wordLen; prefixLen++ {
+				prefix := word[:prefixLen]
+				prefixMap[prefix] = append(prefixMap[prefix], nameEntry{
+					Name:      originalName,
+					WordPos:   wordPos,
+					WordLen:   wordLen,
+					PrefixLen: prefixLen,
+					NameLen:   nameLen,
+				})
 			}
 		}
 
@@ -151,26 +162,37 @@ func main() {
 	if err := rows.Err(); err != nil {
 		log.Fatalf("Error iterando filas: %v", err)
 	}
-
 	log.Printf("✓ Procesados: %d jugadores | Omitidos: %d", processed, skipped)
 
-	// ── Inserción en Redis ───────────────────────────────────────────────────
-	// Para cada prefix: si la key ya existe en Redis, añadimos los nuevos nombres
-	// al JSON array existente (sin duplicados). Si no existe, la creamos.
-
+	// ── Ordenar, deduplicar y serializar ────────────────────────────────────
 	log.Printf("Iniciando inserción de %d keys en Redis...", len(prefixMap))
 
-	inserted := 0
-	updated := 0
-	errors := 0
+	inserted, updated, errors := 0, 0, 0
 
-	for prefix, newNames := range prefixMap {
-		// Intentar obtener el valor existente
+	for prefix, entries := range prefixMap {
+		// 1. Ordenar por score descendente (mayor relevancia primero).
+		//    sort.SliceStable garantiza orden estable entre empates exactos.
+		sort.SliceStable(entries, func(i, j int) bool {
+			return entries[i].score() > entries[j].score()
+		})
+
+		// 2. Deduplicar: si un jugador aparece por varias palabras,
+		//    quedarse solo con su entrada de mayor score (la primera tras el sort).
+		seen := make(map[string]struct{})
+		orderedNames := make([]string, 0, len(entries))
+		for _, e := range entries {
+			if _, ok := seen[e.Name]; !ok {
+				seen[e.Name] = struct{}{}
+				orderedNames = append(orderedNames, e.Name)
+			}
+		}
+
+		// 3. Insertar o hacer merge en Redis
 		existing, err := r.Get(ctx, prefix).Result()
 
 		if err == redis.Nil {
-			// Key no existe → crear nueva
-			data, err := json.Marshal(newNames)
+			// Key nueva
+			data, err := json.Marshal(orderedNames)
 			if err != nil {
 				errors++
 				continue
@@ -187,24 +209,20 @@ func main() {
 			errors++
 
 		} else {
-			// Key existe → hacer merge evitando duplicados
+			// Key existente: agregar al final los nombres nuevos sin duplicar
 			var currentNames []string
 			if err := json.Unmarshal([]byte(existing), &currentNames); err != nil {
-				// Si el valor corrupto, sobreescribir
 				currentNames = []string{}
 			}
 
-			// Construir set de nombres ya presentes
-			seen := make(map[string]struct{}, len(currentNames))
+			existingSeen := make(map[string]struct{}, len(currentNames))
 			for _, n := range currentNames {
-				seen[n] = struct{}{}
+				existingSeen[n] = struct{}{}
 			}
-
-			// Agregar solo los nombres nuevos
-			for _, n := range newNames {
-				if _, ok := seen[n]; !ok {
+			for _, n := range orderedNames {
+				if _, ok := existingSeen[n]; !ok {
 					currentNames = append(currentNames, n)
-					seen[n] = struct{}{}
+					existingSeen[n] = struct{}{}
 				}
 			}
 
