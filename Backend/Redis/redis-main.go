@@ -5,7 +5,8 @@ package main
 // Los resultados se ordenan por relevancia estilo Google:
 //   - Exactitud del match  (peso 0.50): prefixLen / wordLen  → 1.0 si el query cubre toda la palabra
 //   - Posición de la palabra (peso 0.35): 1 / (wordPos + 1)  → primer nombre vale más
-//   - Longitud del nombre  (peso 0.15): 1 / len(name)        → nombres cortos suben en empates
+//   - Longitud del nombre  (peso 0.15): 1 / len(name)        → nombres cortos suben ante igual score
+//   - Desempate final: overall DESC (campo de PostgreSQL, no se almacena en Redis)
 
 import (
 	"context"
@@ -39,11 +40,12 @@ var (
 
 // nameEntry guarda el nombre original y las señales de relevancia para ese prefijo concreto.
 type nameEntry struct {
-	Name        string
-	WordPos     int     // posición de la palabra que generó el match (0 = primer nombre)
-	WordLen     int     // longitud de la palabra completa
-	PrefixLen   int     // longitud del prefijo (= longitud del query que lo generó)
-	NameLen     int     // longitud del nombre completo (para desempate)
+	Name      string
+	WordPos   int // posición de la palabra que generó el match (0 = primer nombre)
+	WordLen   int // longitud de la palabra completa
+	PrefixLen int // longitud del prefijo (= longitud del query que lo generó)
+	NameLen   int // longitud del nombre completo (para desempate de score)
+	Overall   int // overall del jugador en PostgreSQL (desempate final, no se guarda en Redis)
 }
 
 // score calcula la relevancia combinada, imitando las señales básicas de Google:
@@ -113,7 +115,7 @@ func main() {
 	log.Println("✓ Conectado a Redis")
 
 	// ── Consulta PostgreSQL ──────────────────────────────────────────────────
-	rows, err := db.Query("SELECT long_name FROM players")
+	rows, err := db.Query("SELECT long_name, overall FROM players")
 	if err != nil {
 		log.Fatalf("Error ejecutando query: %v", err)
 	}
@@ -126,7 +128,8 @@ func main() {
 
 	for rows.Next() {
 		var originalName string
-		if err := rows.Scan(&originalName); err != nil {
+		var overall      int
+		if err := rows.Scan(&originalName, &overall); err != nil {
 			skipped++
 			continue
 		}
@@ -152,6 +155,7 @@ func main() {
 					WordLen:   wordLen,
 					PrefixLen: prefixLen,
 					NameLen:   nameLen,
+					Overall:   overall,
 				})
 			}
 		}
@@ -170,10 +174,14 @@ func main() {
 	inserted, updated, errors := 0, 0, 0
 
 	for prefix, entries := range prefixMap {
-		// 1. Ordenar por score descendente (mayor relevancia primero).
-		//    sort.SliceStable garantiza orden estable entre empates exactos.
+		// 1. Ordenar por score descendente; desempate por overall descendente.
+		//    sort.SliceStable preserva el orden de llegada ante empate total.
 		sort.SliceStable(entries, func(i, j int) bool {
-			return entries[i].score() > entries[j].score()
+			si, sj := entries[i].score(), entries[j].score()
+			if si != sj {
+				return si > sj
+			}
+			return entries[i].Overall > entries[j].Overall
 		})
 
 		// 2. Deduplicar: si un jugador aparece por varias palabras,
