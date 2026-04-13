@@ -85,4 +85,4 @@ func main() {
 EOF
 
 if command -v sqlc >/dev/null 2>&1; then sqlc generate; else $HOME/go_dist/go/bin/sqlc generate; fi
-echo "✅ Configuración finalizada."
+echo "Configuración finalizada."
