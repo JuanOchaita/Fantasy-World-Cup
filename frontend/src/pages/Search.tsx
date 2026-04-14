@@ -17,6 +17,12 @@ import { useToast } from '@/hooks/use-toast';
 import { COUNTRY_OPTIONS } from '@/lib/countries';
 
 const positions = ['GK', 'DEF', 'MID', 'FWD'] as const;
+const positionFilterMap: Record<(typeof positions)[number], string> = {
+  GK: 'GK',
+  DEF: 'DEF,CB,LB,RB,LWB,RWB',
+  MID: 'MID,CDM,CM,CAM,LM,RM',
+  FWD: 'FWD,ST,CF,LW,RW,LF,RF,LS,RS',
+};
 
 const positionColors: Record<string, string> = {
   GK: 'bg-amber-500/20 text-amber-400',
@@ -24,6 +30,31 @@ const positionColors: Record<string, string> = {
   MID: 'bg-emerald-500/20 text-emerald-400',
   FWD: 'bg-red-500/20 text-red-400',
 };
+
+function parsePlayerPositions(raw?: string): string[] {
+  if (!raw) return [];
+  return Array.from(
+    new Set(
+      raw
+        .split(',')
+        .map(p => p.trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+}
+
+function getPositionTagClass(position: string): string {
+  if (position === 'GK') return positionColors.GK;
+  if (/LB|RB|CB|LWB|RWB|DEF|DF/.test(position)) return positionColors.DEF;
+  if (/ST|CF|LW|RW|LF|RF|FWD|LS|RS/.test(position)) return positionColors.FWD;
+  return positionColors.MID;
+}
+
+function formatStatKey(key: string): string {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, m => m.toUpperCase());
+}
 
 function normalizeImageUrl(raw?: string): string | undefined {
   if (!raw) return undefined;
@@ -107,25 +138,14 @@ const SearchPage = () => {
         page: currentPage,
         size: 50,
         nationality: selectedNationality || undefined,
-        position: selectedPosition || undefined,
+        positions: selectedPosition ? positionFilterMap[selectedPosition as keyof typeof positionFilterMap] : undefined,
         club: selectedClub || undefined,
         min_overall: Number(minOverall),
         max_overall: Number(maxOverall),
       })
       .then(res => {
         if (cancelled) return;
-        const filtered = res.results.filter(p => {
-          const byNationality = selectedNationality
-            ? p.nationality_name?.toLowerCase() === selectedNationality.toLowerCase()
-            : true;
-          const byPosition = selectedPosition
-            ? (p.player_positions || '').toUpperCase().includes(selectedPosition)
-            : true;
-          const byClub = selectedClub ? selectedClub === (p.club_name || '') : true;
-          const byOverall = p.overall >= Number(minOverall) && p.overall <= Number(maxOverall);
-          return byNationality && byPosition && byClub && byOverall;
-        });
-        setSearchResults(filtered);
+        setSearchResults(res.results);
         setTotalPages(res.pagination.total_pages || 1);
         setTotalItems(res.pagination.total_items || 0);
         setClubOptions(prev =>
@@ -152,7 +172,8 @@ const SearchPage = () => {
   const players = useMemo(
     () =>
       searchResults.map(p => {
-        const pos = (p.player_positions || '').toUpperCase();
+        const positionList = parsePlayerPositions(p.player_positions);
+        const pos = positionList.join(',') || (p.player_positions || '').toUpperCase();
         const mappedPosition: Player['position'] = pos.includes('GK')
           ? 'GK'
           : /LB|RB|CB|LWB|RWB|DEF|DF/.test(pos)
@@ -164,6 +185,7 @@ const SearchPage = () => {
           id: String(p.player_id),
           name: p.long_name,
           position: mappedPosition,
+          positions: positionList.length > 0 ? positionList : [mappedPosition],
           team: p.club_name || '—',
           nationality: p.nationality_name || '—',
           price: Math.max(0, (p.value_eur || 0) / 10000000),
@@ -460,9 +482,13 @@ const SearchPage = () => {
                         </p>
                         <p className="text-xs text-muted-foreground truncate">Overall {player.points}</p>
                       </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${positionColors[player.position]}`}>
-                        {player.position}
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                        {(player.positions && player.positions.length > 0 ? player.positions : [player.position]).map(pos => (
+                          <span key={`${player.id}-${pos}`} className={`text-xs px-2 py-0.5 rounded-full font-medium ${getPositionTagClass(pos)}`}>
+                            {pos}
+                          </span>
+                        ))}
+                      </div>
                     </button>
                     <div className="flex items-center gap-4 sm:gap-6 text-sm shrink-0">
                       <div className="text-right">
@@ -528,6 +554,19 @@ const SearchPage = () => {
                 <p className="text-muted-foreground">Position: {selectedDetail.player_positions || '—'}</p>
                 <p className="text-muted-foreground">Overall: {selectedDetail.overall ?? '—'}</p>
                 <p className="text-primary font-display">Fantasy price: £{((selectedDetail.value_eur || 0) / 10000000).toFixed(1)}m</p>
+                <div className="pt-2 border-t border-border/30 space-y-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Stats breakdown</p>
+                  <div className="max-h-64 overflow-auto space-y-1 pr-1">
+                    {Object.entries(selectedDetail).map(([key, value]) => (
+                      <div key={key} className="flex items-start justify-between gap-3 text-xs">
+                        <span className="text-muted-foreground">{formatStatKey(key)}</span>
+                        <span className="text-foreground text-right break-all">
+                          {value == null || value === '' ? '—' : typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">Could not load summary.</p>

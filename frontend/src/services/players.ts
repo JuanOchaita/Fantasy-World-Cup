@@ -4,6 +4,7 @@ export interface Player {
   id: string;
   name: string;
   position: 'GK' | 'DEF' | 'MID' | 'FWD';
+  positions?: string[];
   team: string;
   nationality: string;
   price: number;
@@ -140,7 +141,7 @@ export const playerService = {
     page: number;
     size?: number;
     nationality?: string;
-    position?: string;
+    positions?: string;
     club?: string;
     min_overall?: number;
     max_overall?: number;
@@ -150,8 +151,8 @@ export const playerService = {
     qs.set('page', String(params.page));
     qs.set('size', String(params.size ?? 50));
     if (params.nationality) qs.set('nationality', params.nationality);
-    if (params.position) qs.set('position', params.position);
-    if (params.club) qs.set('club', params.club);
+    if (params.positions) qs.set('positions', params.positions);
+    if (params.club) qs.set('club_name', params.club);
     if (typeof params.min_overall === 'number') qs.set('min_overall', String(params.min_overall));
     if (typeof params.max_overall === 'number') qs.set('max_overall', String(params.max_overall));
 
