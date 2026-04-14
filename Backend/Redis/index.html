@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador Estilo Google</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 100px;
+            background-color: #f8f9fa;
+        }
+        .search-container {
+            position: relative;
+            width: 100%;
+            max-width: 584px;
+        }
+        #search-input {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 16px;
+            border: 1px solid #dfe1e5;
+            border-radius: 24px;
+            outline: none;
+            box-shadow: none;
+            transition: box-shadow 0.2s;
+        }
+        #search-input:focus {
+            box-shadow: 0 1px 6px rgba(32,33,36,0.28);
+            border-color: rgba(223,225,229,0);
+        }
+        .suggestions-container {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #dfe1e5;
+            border-top: none;
+            border-bottom-left-radius: 24px;
+            border-bottom-right-radius: 24px;
+            box-shadow: 0 4px 6px rgba(32,33,36,0.28);
+            z-index: 1000;
+            display: none;
+            overflow: hidden;
+            margin-top: -1px;
+            padding-bottom: 10px;
+        }
+        .suggestion-item {
+            padding: 10px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .suggestion-item:hover {
+            background-color: #f1f1f1;
+        }
+        .suggestion-item i {
+            margin-right: 15px;
+            color: #9aa0a6;
+        }
+        .active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="search-container">
+        <input type="text" id="search-input" placeholder="Busca un jugador..." autocomplete="off">
+        <div id="suggestions" class="suggestions-container"></div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('search-input');
+        const suggestionsContainer = document.getElementById('suggestions');
+        let debounceTimer;
+
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            const query = searchInput.value.trim();
+
+            if (query.length === 0) {
+                suggestionsContainer.innerHTML = '';
+                suggestionsContainer.classList.remove('active');
+                return;
+            }
+
+            debounceTimer = setTimeout(() => {
+                fetchSuggestions(query);
+            }, 300); // 300ms de delay
+        });
+
+        async function fetchSuggestions(query) {
+            try {
+                const response = await fetch(`http://localhost:8081/redis?key=${encodeURIComponent(query)}`);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const players = await response.json();
+                displaySuggestions(players);
+            } catch (error) {
+                console.error('Error fetching suggestions:', error);
+                suggestionsContainer.innerHTML = '';
+                suggestionsContainer.classList.remove('active');
+            }
+        }
+
+        function displaySuggestions(players) {
+            if (!Array.isArray(players) || players.length === 0) {
+                suggestionsContainer.innerHTML = '';
+                suggestionsContainer.classList.remove('active');
+                return;
+            }
+
+            suggestionsContainer.innerHTML = players
+                .slice(0, 10) // Mostrar máximo 10 sugerencias
+                .map(player => `
+                    <div class="suggestion-item" onclick="selectPlayer('${player.name}')">
+                        <span>${player.name}</span>
+                    </div>
+                `).join('');
+            
+            suggestionsContainer.classList.add('active');
+        }
+
+        function selectPlayer(name) {
+            searchInput.value = name;
+            suggestionsContainer.innerHTML = '';
+            suggestionsContainer.classList.remove('active');
+            // Aquí podrías redirigir o realizar otra acción
+            console.log('Jugador seleccionado:', name);
+        }
+
+        // Cerrar sugerencias al hacer clic fuera
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-container')) {
+                suggestionsContainer.innerHTML = '';
+                suggestionsContainer.classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html>
