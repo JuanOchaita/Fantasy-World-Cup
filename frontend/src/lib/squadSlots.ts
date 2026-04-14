@@ -36,6 +36,16 @@ function linePositions(count: number): string[] {
   return Array.from({ length: count }, (_, i) => `${pad + i * step}%`);
 }
 
+// Keep player circles aligned to the same horizontal field bounds
+// used by the pitch markings (`left/right: 8%` in Squad page).
+function toPitchAlignedLeft(rawPercent: string): string {
+  const n = Number.parseFloat(rawPercent);
+  if (Number.isNaN(n)) return rawPercent;
+  const leftBound = 8;
+  const width = 84;
+  return `${leftBound + (n / 100) * width}%`;
+}
+
 export function getFormationShape(formation: string): FormationShape {
   return parseFormation(formation);
 }
@@ -54,13 +64,13 @@ export function getPitchLayout(formation: string): SlotLayout[] {
   const layout: SlotLayout[] = [{ slot: 'GK', posLabel: 'GK', top: '88%', left: '50%' }];
 
   linePositions(shape.DEF).forEach((left, i) => {
-    layout.push({ slot: `D${i + 1}`, posLabel: 'DEF', top: '68%', left });
+    layout.push({ slot: `D${i + 1}`, posLabel: 'DEF', top: '68%', left: toPitchAlignedLeft(left) });
   });
   linePositions(shape.MID).forEach((left, i) => {
-    layout.push({ slot: `M${i + 1}`, posLabel: 'MID', top: '45%', left });
+    layout.push({ slot: `M${i + 1}`, posLabel: 'MID', top: '45%', left: toPitchAlignedLeft(left) });
   });
   linePositions(shape.FWD).forEach((left, i) => {
-    layout.push({ slot: `F${i + 1}`, posLabel: 'FWD', top: '22%', left });
+    layout.push({ slot: `F${i + 1}`, posLabel: 'FWD', top: '22%', left: toPitchAlignedLeft(left) });
   });
 
   return layout;

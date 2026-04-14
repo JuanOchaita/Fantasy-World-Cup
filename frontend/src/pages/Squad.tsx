@@ -268,10 +268,10 @@ const SquadPage = () => {
           </div>
         )}
 
-        <div className="glass-card rounded-xl overflow-hidden">
+        <div className="glass-card rounded-xl overflow-hidden max-w-3xl mx-auto">
           <div
             className="relative w-full"
-            style={{ paddingBottom: '140%', background: 'linear-gradient(180deg, hsl(140 40% 18%) 0%, hsl(140 35% 14%) 100%)' }}
+            style={{ paddingBottom: '95%', background: 'linear-gradient(180deg, hsl(140 40% 18%) 0%, hsl(140 35% 14%) 100%)' }}
           >
             <div className="absolute inset-[8%] border-2 border-foreground/10 rounded-2xl" />
             <div className="absolute left-[8%] right-[8%] top-1/2 h-px bg-foreground/10" />
