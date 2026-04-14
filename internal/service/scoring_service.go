@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 
@@ -90,12 +91,26 @@ func (s *ScoringService) ProcessMatchResult(
 			return fmt.Errorf("zincrby for user %s: %w", user.Username, err)
 		}
 
+		// Persistimos también en PostgreSQL para mantener puntaje entre reinicios/sesiones.
+		updatedSquad, err := s.repo.IncrementSquadTotalPoints(ctx, repository.IncrementSquadTotalPointsParams{
+			SquadID:     squad.SquadID,
+			TotalPoints: sql.NullInt32{Int32: matchPoints, Valid: true},
+		})
+		if err != nil {
+			return fmt.Errorf("increment squad total points for squad %d: %w", squad.SquadID, err)
+		}
+
+		totalAfterMatch := int32(newTotal)
+		if updatedSquad.TotalPoints.Valid {
+			totalAfterMatch = updatedSquad.TotalPoints.Int32
+		}
+
 		// Postgres guarda el historial como backup/auditoría
 		_, err = s.repo.CreateMatchUserPoints(ctx, repository.CreateMatchUserPointsParams{
 			MatchID:               match.MatchID,
 			UserID:                squad.UserID,
 			PointsEarned:          matchPoints,
-			TotalPointsAfterMatch: int32(newTotal),
+			TotalPointsAfterMatch: totalAfterMatch,
 		})
 		if err != nil {
 			return fmt.Errorf("create match_user_points for user %d: %w", squad.UserID, err)

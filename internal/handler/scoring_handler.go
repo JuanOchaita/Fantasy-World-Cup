@@ -180,19 +180,25 @@ func (h *ScoringHandler) GetMyRank(c *gin.Context) {
 		Offset: 0,
 	})
 	gameWins := int32(0)
+	historyTotalPoints := int32(0)
 	if historyErr == nil {
 		for _, row := range history {
-			if row.PointsEarned > 0 {
+			historyTotalPoints += row.PointsEarned
+			if row.PointsEarned > 0 && row.ScoreA != row.ScoreB {
 				gameWins++
 			}
 		}
 	}
 	if err != nil {
+		fallbackScore := nullInt32ToFloat64(squad.TotalPoints)
+		if historyErr == nil {
+			fallbackScore = float64(historyTotalPoints)
+		}
 		c.JSON(http.StatusOK, myRankResponse{
 			Username:  user.Username,
 			SquadName: squad.SquadName,
 			Rank:      0,
-			Score:     nullInt32ToFloat64(squad.TotalPoints),
+			Score:     fallbackScore,
 			GameWins:  gameWins,
 			Message:   "aun no estas en el ranking de Redis (sincronizando...)",
 		})
