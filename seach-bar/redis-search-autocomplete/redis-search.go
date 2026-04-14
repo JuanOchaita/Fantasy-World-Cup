@@ -18,6 +18,13 @@ import (
 var ctx = context.Background()
 var rdb *redis.Client
 
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
 // playerEntry es el formato almacenado en Redis para cada jugador.
 type playerEntry struct {
 	ID   int    `json:"id"`
@@ -57,7 +64,7 @@ func normalizeKey(raw string) string {
 
 func main() {
 	rdb = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
 		Password: "",
 		DB:       0,
 	})

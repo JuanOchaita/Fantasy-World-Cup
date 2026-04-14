@@ -6,6 +6,7 @@ import AppLayout from '@/components/AppLayout';
 import { squadService, mapSquadDetails } from '@/services/squad';
 import type { Squad } from '@/services/squad';
 import { leaderboardService } from '@/services/leaderboard';
+import { playerService } from '@/services/players';
 import { FORMATION_OPTIONS, getFormationShape, getPitchLayout } from '@/lib/squadSlots';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ const SquadPage = () => {
   const [newName, setNewName] = useState('My Squad');
   const [formation, setFormation] = useState('4-3-3');
   const [accumulatedPoints, setAccumulatedPoints] = useState(0);
+  const [playerFaceById, setPlayerFaceById] = useState<Record<string, string>>({});
 
   const load = async () => {
     setLoading(true);
@@ -53,6 +55,37 @@ const SquadPage = () => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load once on mount
   }, []);
+
+  useEffect(() => {
+    if (!squad?.players?.length) return;
+    let cancelled = false;
+    const missingIds = squad.players.map(p => p.id).filter(id => id && !playerFaceById[id]);
+    if (!missingIds.length) return;
+
+    Promise.all(
+      missingIds.map(async id => {
+        try {
+          const detail = await playerService.getDetailById(Number(id));
+          return { id, url: detail.player_face_url?.trim() || '' };
+        } catch {
+          return { id, url: '' };
+        }
+      })
+    ).then(entries => {
+      if (cancelled) return;
+      setPlayerFaceById(prev => {
+        const next = { ...prev };
+        for (const entry of entries) {
+          if (entry.url) next[entry.id] = entry.url;
+        }
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [squad, playerFaceById]);
 
   const handleCreate = async () => {
     setCreating(true);
@@ -322,14 +355,15 @@ const SquadPage = () => {
 
             {pitchLayout.map(({ slot, posLabel, top, left }) => {
               const pl = squad.players.find(p => p.positionSlot === slot);
-              const label = pl
+              const initials = pl
                 ? (() => {
                     const parts = pl.name.trim().split(/\s+/).filter(Boolean);
-                    if (parts.length >= 2) return `${parts[0][0]} ${parts[1]}`;
-                    if (parts.length === 1) return parts[0];
+                    if (parts.length >= 2) return `${parts[0][0]} ${parts[1][0]}`;
+                    if (parts.length === 1) return parts[0][0];
                     return '';
                   })()
                 : '';
+              const faceUrl = pl ? playerFaceById[pl.id] : '';
               return (
                 <motion.div
                   key={slot}
@@ -342,12 +376,25 @@ const SquadPage = () => {
                   <div className="relative">
                     <div
                       className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 flex items-center justify-center text-[10px] sm:text-xs font-display text-center leading-tight px-1 ${
-                        label
+                        pl
                           ? 'bg-primary/20 border-primary text-foreground'
                           : 'bg-muted/40 border-dashed border-primary/40 text-primary/60'
                       }`}
                     >
-                      {label}
+                      {pl && faceUrl ? (
+                        <img
+                          src={faceUrl}
+                          alt={pl.name}
+                          className="w-full h-full rounded-full object-cover"
+                          referrerPolicy="no-referrer"
+                          onError={e => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLSpanElement | null;
+                            if (fallback) fallback.style.display = 'inline';
+                          }}
+                        />
+                      ) : null}
+                      <span style={{ display: pl && faceUrl ? 'none' : 'inline' }}>{initials}</span>
                     </div>
                     {pl && (
                       <button

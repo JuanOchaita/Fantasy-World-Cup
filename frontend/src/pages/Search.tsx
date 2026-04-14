@@ -25,6 +25,17 @@ const positionColors: Record<string, string> = {
   FWD: 'bg-red-500/20 text-red-400',
 };
 
+function normalizeImageUrl(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  try {
+    return encodeURI(trimmed);
+  } catch {
+    return undefined;
+  }
+}
+
 const SearchPage = () => {
   const { toast } = useToast();
   const [query, setQuery] = useState('');
@@ -157,7 +168,7 @@ const SearchPage = () => {
           nationality: p.nationality_name || '—',
           price: Math.max(0, (p.value_eur || 0) / 10000000),
           points: p.overall,
-          imageUrl: detailCache[p.player_id]?.player_face_url,
+          imageUrl: normalizeImageUrl(detailCache[p.player_id]?.player_face_url),
         } as Player;
       }),
     [searchResults, detailCache]
@@ -417,16 +428,30 @@ const SearchPage = () => {
                     >
                       <div className="w-12 h-12 shrink-0 rounded-full bg-muted overflow-hidden">
                         {player.imageUrl ? (
-                          <img src={player.imageUrl} alt={player.name} className="w-full h-full object-cover" />
+                          <img
+                            src={player.imageUrl}
+                            alt={player.name}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                            onError={e => {
+                              e.currentTarget.style.display = 'none';
+                              const fallback = e.currentTarget.nextElementSibling as HTMLDivElement | null;
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
+                          />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center font-display text-xs text-muted-foreground">
-                            {player.name
-                              .split(' ')
-                              .map(n => n[0])
-                              .join('')
-                              .slice(0, 3)}
-                          </div>
+                          <></>
                         )}
+                        <div
+                          className="w-full h-full items-center justify-center font-display text-xs text-muted-foreground hidden"
+                          style={{ display: player.imageUrl ? 'none' : 'flex' }}
+                        >
+                          {player.name
+                            .split(' ')
+                            .map(n => n[0])
+                            .join('')
+                            .slice(0, 3)}
+                        </div>
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium text-foreground truncate">{player.name}</p>
@@ -486,9 +511,17 @@ const SearchPage = () => {
               </div>
             ) : selectedDetail ? (
               <div className="space-y-3 text-sm">
-                {selectedDetail.player_face_url && (
-                  <img src={selectedDetail.player_face_url} alt={selectedDetail.long_name} className="w-24 h-24 rounded-full object-cover border border-border/40" />
-                )}
+                {normalizeImageUrl(selectedDetail.player_face_url) ? (
+                  <img
+                    src={normalizeImageUrl(selectedDetail.player_face_url)}
+                    alt={selectedDetail.long_name}
+                    className="w-24 h-24 rounded-full object-cover border border-border/40"
+                    referrerPolicy="no-referrer"
+                    onError={e => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                ) : null}
                 <p className="font-medium text-foreground">{selectedDetail.long_name || selectedDetail.short_name}</p>
                 <p className="text-muted-foreground">Nationality: {selectedDetail.nationality_name || '—'}</p>
                 <p className="text-muted-foreground">Club: {selectedDetail.club_name || '—'}</p>

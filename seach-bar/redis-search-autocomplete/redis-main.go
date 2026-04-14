@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strings"
 	"unicode"
@@ -26,17 +27,36 @@ import (
 )
 
 var (
-	postgresql_host     = "localhost"
-	postgresql_port     = 5433
-	postgresql_user     = "admin"
-	postgresql_password = "admin"
-	postgresql_dbname   = "labdb"
+	postgresql_host     = getEnv("PG_HOST", "localhost")
+	postgresql_port     = getEnvInt("PG_PORT", 5433)
+	postgresql_user     = getEnv("PG_USER", "admin")
+	postgresql_password = getEnv("PG_PASSWORD", "admin")
+	postgresql_dbname   = getEnv("PG_DB", "labdb")
 
-	redis_host     = "localhost"
-	redis_port     = 6379
-	redis_password = ""
+	redis_host     = getEnv("REDIS_HOST", "localhost")
+	redis_port     = getEnvInt("REDIS_PORT", 6379)
+	redis_password = getEnv("REDIS_PASSWORD", "")
 	redis_db       = 0
 )
+
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	v := getEnv(key, "")
+	if v == "" {
+		return fallback
+	}
+	var n int
+	if _, err := fmt.Sscanf(v, "%d", &n); err != nil {
+		return fallback
+	}
+	return n
+}
 
 // playerEntry es el formato final almacenado en Redis para cada jugador.
 type playerEntry struct {
