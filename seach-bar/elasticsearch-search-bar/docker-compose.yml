@@ -1,0 +1,35 @@
+version: '3.9'
+
+# This docker-compose file sets up a complete learning environment for:
+# - Elasticsearch: Distributed search and analytics engine
+
+services:
+  elasticsearch:
+    image: elasticsearch:8.13.0
+    container_name: search-lab-elasticsearch
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - search-lab-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# Shared network for inter-service communication
+networks:
+  search-lab-net:
+    driver: bridge
+
+# Named volumes for data persistence
+volumes:
+  elasticsearch-data:
+    driver: local
