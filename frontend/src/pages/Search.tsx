@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Search as SearchIcon, X, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -56,6 +56,60 @@ function formatStatKey(key: string): string {
     .replace(/\b\w/g, m => m.toUpperCase());
 }
 
+const detailedStatSections = [
+  {
+    title: 'Attacking',
+    metrics: [
+      ['attacking_crossing', 'Crossing'],
+      ['attacking_finishing', 'Finishing'],
+      ['attacking_heading_accuracy', 'Heading Accuracy'],
+      ['attacking_short_passing', 'Short Passing'],
+      ['attacking_volleys', 'Volleys'],
+    ] as const,
+  },
+  {
+    title: 'Mentality',
+    metrics: [
+      ['mentality_aggression', 'Aggression'],
+      ['mentality_interceptions', 'Interceptions'],
+      ['mentality_positioning', 'Positioning'],
+      ['mentality_vision', 'Vision'],
+      ['mentality_penalties', 'Penalties'],
+      ['mentality_composure', 'Composure'],
+    ] as const,
+  },
+  {
+    title: 'Defense',
+    metrics: [
+      ['defending_marking_awareness', 'Marking'],
+      ['defending_standing_tackle', 'Stand Tackle'],
+      ['defending_sliding_tackle', 'Slide Tackle'],
+    ] as const,
+  },
+  {
+    title: 'Goalkeeping',
+    metrics: [
+      ['goalkeeping_diving', 'Diving'],
+      ['goalkeeping_handling', 'Handling'],
+      ['goalkeeping_kicking', 'Kicking'],
+      ['goalkeeping_positioning', 'Positioning'],
+      ['goalkeeping_reflexes', 'Reflexes'],
+    ] as const,
+  },
+];
+
+const positionRatings = [
+  'st', 'ls', 'rs', 'lw', 'rw', 'lf', 'rf', 'cf',
+  'cam', 'lam', 'ram', 'cm', 'lcm', 'rcm', 'cdm', 'ldm', 'rdm',
+  'lm', 'rm', 'lb', 'rb', 'lwb', 'rwb', 'lcb', 'rcb', 'cb', 'gk',
+] as const;
+
+function formatStatValue(value: unknown): string {
+  if (value == null || value === '') return '—';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
 function normalizeImageUrl(raw?: string): string | undefined {
   if (!raw) return undefined;
   const trimmed = raw.trim();
@@ -89,6 +143,7 @@ const SearchPage = () => {
   const [addingId, setAddingId] = useState<string | null>(null);
   const [squad, setSquad] = useState<Squad | null>(null);
   const [squadLoading, setSquadLoading] = useState(true);
+  const skipNextSuggestFetchRef = useRef(false);
 
   const refreshSquad = useCallback(async () => {
     try {
@@ -111,6 +166,10 @@ const SearchPage = () => {
   }, [query]);
 
   useEffect(() => {
+    if (skipNextSuggestFetchRef.current) {
+      skipNextSuggestFetchRef.current = false;
+      return;
+    }
     if (!debouncedQuery) {
       setSuggestions([]);
       return;
@@ -198,10 +257,12 @@ const SearchPage = () => {
 
   const selectedDetail = selectedPlayerId ? detailCache[selectedPlayerId] : undefined;
   const handlePickSuggestion = (s: RedisPlayerSuggestion) => {
+    skipNextSuggestFetchRef.current = true;
     setQuery(s.name);
     setDebouncedQuery(s.name);
     setSuggestions([]);
     setSelectedPlayerId(s.id);
+    void fetchDetail(s.id);
   };
 
   const fetchDetail = async (playerId: number) => {
@@ -556,15 +617,79 @@ const SearchPage = () => {
                 <p className="text-primary font-display">Fantasy price: £{((selectedDetail.value_eur || 0) / 10000000).toFixed(1)}m</p>
                 <div className="pt-2 border-t border-border/30 space-y-2">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Stats breakdown</p>
-                  <div className="max-h-64 overflow-auto space-y-1 pr-1">
-                    {Object.entries(selectedDetail).map(([key, value]) => (
-                      <div key={key} className="flex items-start justify-between gap-3 text-xs">
-                        <span className="text-muted-foreground">{formatStatKey(key)}</span>
-                        <span className="text-foreground text-right break-all">
-                          {value == null || value === '' ? '—' : typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                        </span>
+                  <div className="max-h-96 overflow-auto space-y-4 pr-1">
+                    {detailedStatSections.map(section => (
+                      <div key={section.title} className="space-y-2">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{section.title}</p>
+                        <div className="grid grid-cols-1 gap-2">
+                          {section.metrics.map(([key, label]) => {
+                            const rawValue = (selectedDetail as Record<string, unknown>)[key];
+                            const value = typeof rawValue === 'number' ? Math.max(0, Math.min(100, rawValue)) : null;
+                            return (
+                              <div key={key} className="text-xs">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-muted-foreground">{label}</span>
+                                  <span className="font-medium text-foreground">{formatStatValue(rawValue)}</span>
+                                </div>
+                                <div className="mt-1 h-1.5 rounded bg-muted/50 overflow-hidden">
+                                  <div className="h-full bg-primary/70" style={{ width: `${value ?? 0}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     ))}
+
+                    <div className="space-y-2">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Position ratings</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {positionRatings
+                          .filter(key => (selectedDetail as Record<string, unknown>)[key] != null)
+                          .map(key => (
+                            <div key={key} className="rounded-md bg-muted/30 p-2 text-center">
+                              <p className="text-[10px] uppercase text-muted-foreground">{key}</p>
+                              <p className="text-xs font-medium text-foreground">{formatStatValue((selectedDetail as Record<string, unknown>)[key])}</p>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Traits</p>
+                      <div className="flex flex-wrap gap-1">
+                        {(selectedDetail.player_traits || '')
+                          .split(',')
+                          .map(t => t.trim())
+                          .filter(Boolean)
+                          .map(trait => (
+                            <span key={trait} className="rounded-full border border-border/40 bg-muted/30 px-2 py-0.5 text-[11px] text-foreground">
+                              {trait}
+                            </span>
+                          ))}
+                        {!(selectedDetail.player_traits || '').trim() && <span className="text-xs text-muted-foreground">—</span>}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">FIFA metadata</p>
+                      {(['fifa_version', 'fifa_update_date', 'work_rate', 'preferred_foot', 'weak_foot', 'skill_moves'] as const).map(key => (
+                        <div key={key} className="flex items-start justify-between gap-3 text-xs">
+                          <span className="text-muted-foreground">{formatStatKey(key)}</span>
+                          <span className="text-foreground text-right break-all">{formatStatValue((selectedDetail as Record<string, unknown>)[key])}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">All returned fields</p>
+                      {Object.entries(selectedDetail).map(([key, value]) => (
+                        <div key={key} className="flex items-start justify-between gap-3 text-xs">
+                          <span className="text-muted-foreground">{formatStatKey(key)}</span>
+                          <span className="text-foreground text-right break-all">{formatStatValue(value)}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
