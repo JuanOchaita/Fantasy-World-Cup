@@ -38,8 +38,9 @@ const RegisterPage = () => {
     try {
       await authRegister(data.username, data.email, data.password, data.confirmPassword);
       navigate('/dashboard');
-    } catch (e: any) {
-      setError(e.message || 'Registration failed. Please try again.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Registration failed. Please try again.';
+      setError(msg);
     } finally {
       setLoading(false);
     }

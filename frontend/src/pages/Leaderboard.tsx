@@ -1,17 +1,8 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trophy, Medal, TrendingUp } from 'lucide-react';
+import { Trophy, Medal, TrendingUp, Loader2 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
-
-const mockLeaderboard = [
-  { rank: 1, username: 'GoalMachine', squadName: 'Unstoppables FC', totalPoints: 456, gameweekPoints: 87 },
-  { rank: 2, username: 'TacticalGenius', squadName: 'Formation Masters', totalPoints: 441, gameweekPoints: 72 },
-  { rank: 3, username: 'TransferKing', squadName: 'Market Movers', totalPoints: 438, gameweekPoints: 65 },
-  { rank: 4, username: 'SetPieceExpert', squadName: 'Corner Takers', totalPoints: 425, gameweekPoints: 58 },
-  { rank: 5, username: 'CleanSheetFC', squadName: 'The Wall', totalPoints: 419, gameweekPoints: 54 },
-  { rank: 6, username: 'YoungGunner', squadName: 'Rising Stars', totalPoints: 412, gameweekPoints: 61 },
-  { rank: 7, username: 'MidfieldMaestro', squadName: 'Tiki-Taka XI', totalPoints: 405, gameweekPoints: 49 },
-  { rank: 8, username: 'CounterAttack', squadName: 'Speed Demons', totalPoints: 398, gameweekPoints: 52 },
-];
+import { leaderboardService, type LeaderboardEntry } from '@/services/leaderboard';
 
 const rankIcon = (rank: number) => {
   if (rank === 1) return <Trophy className="h-5 w-5 text-primary" />;
@@ -21,6 +12,32 @@ const rankIcon = (rank: number) => {
 };
 
 const LeaderboardPage = () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [items, setItems] = useState<LeaderboardEntry[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    leaderboardService
+      .getGlobal(1, 50)
+      .then(res => {
+        if (!cancelled) setItems(res.items);
+      })
+      .catch(err => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load leaderboard');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <AppLayout>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -35,31 +52,41 @@ const LeaderboardPage = () => {
         <div className="glass-card rounded-xl overflow-hidden">
           {/* Header */}
           <div className="grid grid-cols-12 gap-2 px-4 py-3 text-xs font-medium text-muted-foreground border-b border-border/30 uppercase tracking-wider">
-            <div className="col-span-1">#</div>
-            <div className="col-span-5">Manager</div>
-            <div className="col-span-3 hidden sm:block">Squad</div>
-            <div className="col-span-2 text-right">GW</div>
-            <div className="col-span-1 text-right">Total</div>
+            <div className="col-span-2 sm:col-span-1">#</div>
+            <div className="col-span-7 sm:col-span-8">Manager</div>
+            <div className="col-span-3 text-right">Total</div>
           </div>
 
-          {/* Rows */}
-          {mockLeaderboard.map((entry, i) => (
-            <motion.div
-              key={entry.rank}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className={`grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm ${
-                i < 3 ? 'bg-primary/5' : ''
-              } ${i < mockLeaderboard.length - 1 ? 'border-b border-border/10' : ''}`}
-            >
-              <div className="col-span-1 flex items-center">{rankIcon(entry.rank)}</div>
-              <div className="col-span-5 font-medium text-foreground">{entry.username}</div>
-              <div className="col-span-3 hidden sm:block text-muted-foreground text-xs">{entry.squadName}</div>
-              <div className="col-span-2 text-right text-muted-foreground">{entry.gameweekPoints}</div>
-              <div className="col-span-1 text-right font-display text-primary">{entry.totalPoints}</div>
-            </motion.div>
-          ))}
+          {loading && (
+            <div className="py-10 flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading leaderboard...
+            </div>
+          )}
+
+          {!loading && error && <div className="py-10 text-center text-destructive text-sm">{error}</div>}
+
+          {!loading && !error && items.length === 0 && (
+            <div className="py-10 text-center text-muted-foreground text-sm">No ranking data available yet.</div>
+          )}
+
+          {!loading &&
+            !error &&
+            items.map((entry, i) => (
+              <motion.div
+                key={`${entry.rank}-${entry.username}`}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.03 }}
+                className={`grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm ${
+                  i < 3 ? 'bg-primary/5' : ''
+                } ${i < items.length - 1 ? 'border-b border-border/10' : ''}`}
+              >
+                <div className="col-span-2 sm:col-span-1 flex items-center">{rankIcon(entry.rank)}</div>
+                <div className="col-span-7 sm:col-span-8 font-medium text-foreground">{entry.username}</div>
+                <div className="col-span-3 text-right font-display text-primary">{entry.totalPoints}</div>
+              </motion.div>
+            ))}
         </div>
       </motion.div>
     </AppLayout>

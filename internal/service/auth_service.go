@@ -2,12 +2,15 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/delta/fantasy-world-cup/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -31,17 +34,56 @@ type TokenPair struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+var (
+	ErrUsernameTaken = errors.New("username already in use")
+	ErrEmailTaken    = errors.New("email already in use")
+)
+
 func (s *AuthService) Register(ctx context.Context, username, email, password string) (repository.User, error) {
+	if _, err := s.repo.GetUserByUsername(ctx, username); err == nil {
+		return repository.User{}, ErrUsernameTaken
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return repository.User{}, err
+	}
+
+	if _, err := s.repo.GetUserByEmail(ctx, email); err == nil {
+		return repository.User{}, ErrEmailTaken
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return repository.User{}, err
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return repository.User{}, err
 	}
 
-	return s.repo.CreateUser(ctx, repository.CreateUserParams{
+	user, err := s.repo.CreateUser(ctx, repository.CreateUserParams{
 		Username:     username,
 		Email:        email,
 		PasswordHash: string(hashedPassword),
 	})
+	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && string(pqErr.Code) == "23505" {
+			constraint := strings.ToLower(pqErr.Constraint)
+			switch {
+			case strings.Contains(constraint, "username"):
+				return repository.User{}, ErrUsernameTaken
+			case strings.Contains(constraint, "email"):
+				return repository.User{}, ErrEmailTaken
+			default:
+				detail := strings.ToLower(pqErr.Detail)
+				if strings.Contains(detail, "username") {
+					return repository.User{}, ErrUsernameTaken
+				}
+				if strings.Contains(detail, "email") {
+					return repository.User{}, ErrEmailTaken
+				}
+			}
+		}
+		return repository.User{}, err
+	}
+	return user, nil
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (TokenPair, error) {

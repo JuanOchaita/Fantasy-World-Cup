@@ -31,7 +31,8 @@ const Dashboard = () => {
         if (cancelled) return;
         const squad = mapSquadDetails(squadRaw);
         setGlobalRank(myRank.rank > 0 ? myRank.rank : null);
-        setSquadPoints(squad.totalPoints);
+        // Keep dashboard points consistent with leaderboard source of truth.
+        setSquadPoints(Number.isFinite(myRank.score) ? myRank.score : squad.totalPoints);
         setGameWins(myRank.game_wins ?? 0);
         setBudgetLeft(squad.budgetRemaining);
       } catch {

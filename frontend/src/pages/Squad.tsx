@@ -5,6 +5,7 @@ import { Users, DollarSign, Loader2, X } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import { squadService, mapSquadDetails } from '@/services/squad';
 import type { Squad } from '@/services/squad';
+import { leaderboardService } from '@/services/leaderboard';
 import { FORMATION_OPTIONS, getFormationShape, getPitchLayout } from '@/lib/squadSlots';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,15 +21,20 @@ const SquadPage = () => {
   const [removingPlayerId, setRemovingPlayerId] = useState<string | null>(null);
   const [newName, setNewName] = useState('My Squad');
   const [formation, setFormation] = useState('4-3-3');
+  const [accumulatedPoints, setAccumulatedPoints] = useState(0);
 
   const load = async () => {
     setLoading(true);
     try {
-      const raw = await squadService.getDetails();
+      const [raw, rankInfo] = await Promise.all([
+        squadService.getDetails(),
+        leaderboardService.getAroundUser().catch(() => null),
+      ]);
       const mapped = mapSquadDetails(raw);
       setSquad(mapped);
       setNewName(mapped.name);
       setFormation(mapped.formation);
+      setAccumulatedPoints(rankInfo && Number.isFinite(rankInfo.score) ? rankInfo.score : mapped.totalPoints);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to load squad';
       const m = msg.toLowerCase();
@@ -201,6 +207,11 @@ const SquadPage = () => {
   const spent = squad.budget - squad.budgetRemaining;
   const shape = getFormationShape(squad.formation);
   const pitchLayout = getPitchLayout(squad.formation);
+  const slotRows = pitchLayout.map(({ slot, posLabel }) => ({
+    slot,
+    posLabel,
+    player: squad.players.find(p => p.positionSlot === slot) ?? null,
+  }));
 
   return (
     <AppLayout>
@@ -213,15 +224,7 @@ const SquadPage = () => {
               DEF {shape.DEF} · MID {shape.MID} · FWD {shape.FWD}
             </p>
           </div>
-          <div className="flex gap-4">
-            <div className="glass-card rounded-lg px-4 py-2 flex items-center gap-2">
-              <Users className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium text-foreground">{count}/11</span>
-            </div>
-            <div className="glass-card rounded-lg px-4 py-2 flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium text-foreground">£{squad.budgetRemaining.toFixed(1)}m left</span>
-            </div>
+          <div className="flex gap-4 items-center">
             <Button
               type="button"
               variant="outline"
@@ -234,6 +237,35 @@ const SquadPage = () => {
             >
               {editing ? 'Cancel edit' : 'Edit squad'}
             </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="glass-card rounded-lg px-4 py-3">
+            <p className="text-xs text-muted-foreground">Formation</p>
+            <p className="text-sm font-medium text-foreground">{squad.formation}</p>
+          </div>
+          <div className="glass-card rounded-lg px-4 py-3 flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-xs text-muted-foreground">Slots filled</p>
+              <p className="text-sm font-medium text-foreground">{count}/11</p>
+            </div>
+          </div>
+          <div className="glass-card rounded-lg px-4 py-3 flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-xs text-muted-foreground">Total squad cost</p>
+              <p className="text-sm font-medium text-foreground">£{spent.toFixed(1)}m</p>
+            </div>
+          </div>
+          <div className="glass-card rounded-lg px-4 py-3">
+            <p className="text-xs text-muted-foreground">Remaining budget</p>
+            <p className="text-sm font-medium text-foreground">£{squad.budgetRemaining.toFixed(1)}m</p>
+          </div>
+          <div className="glass-card rounded-lg px-4 py-3">
+            <p className="text-xs text-muted-foreground">Accumulated points</p>
+            <p className="text-sm font-medium text-foreground">{accumulatedPoints}</p>
           </div>
         </div>
 
@@ -323,8 +355,22 @@ const SquadPage = () => {
           </div>
         </div>
 
+        <div className="glass-card rounded-xl p-4">
+          <h2 className="text-sm font-medium text-foreground mb-3">All 11 slots</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {slotRows.map(({ slot, posLabel, player }) => (
+              <div key={slot} className="rounded-md border border-border/40 px-3 py-2 bg-muted/20">
+                <p className="text-xs text-muted-foreground">
+                  {slot} · {posLabel}
+                </p>
+                <p className="text-sm text-foreground truncate">{player ? player.name : 'Empty slot'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <p className="text-center text-sm text-muted-foreground">
-          Budget used: £{spent.toFixed(1)}m · Points: {squad.totalPoints}. Go to{' '}
+          Budget used: £{spent.toFixed(1)}m · Points: {accumulatedPoints}. Go to{' '}
           <Link to="/search" className="text-primary hover:underline">
             Player Search
           </Link>{' '}

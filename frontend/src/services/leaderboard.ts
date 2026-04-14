@@ -2,11 +2,10 @@ import request from './api';
 
 export interface LeaderboardEntry {
   rank: number;
-  userId: string;
   username: string;
-  squadName: string;
+  squadName?: string;
   totalPoints: number;
-  gameweekPoints: number;
+  gameweekPoints?: number;
 }
 
 export interface MyRankResponse {
@@ -19,8 +18,23 @@ export interface MyRankResponse {
 }
 
 export const leaderboardService = {
-  getGlobal: (page = 1, limit = 50) =>
-    request<{ page: number; limit: number; items: LeaderboardEntry[] }>(`/leaderboard?page=${page}&limit=${limit}`),
+  getGlobal: async (page = 1, limit = 50): Promise<{ page: number; limit: number; items: LeaderboardEntry[] }> => {
+    const res = await request<{
+      page: number;
+      limit: number;
+      items: Array<{ rank: number; username: string; total_points: number }>;
+    }>(`/leaderboard?page=${page}&limit=${limit}`);
+
+    return {
+      page: res.page,
+      limit: res.limit,
+      items: res.items.map(item => ({
+        rank: item.rank,
+        username: item.username,
+        totalPoints: item.total_points,
+      })),
+    };
+  },
 
   getAroundUser: () => request<MyRankResponse>('/leaderboard/me'),
 };

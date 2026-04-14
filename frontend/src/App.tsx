@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import SearchPage from "./pages/Search";
 import SquadPage from "./pages/Squad";
 import LeaderboardPage from "./pages/Leaderboard";
+import MatchHistoryPage from "./pages/MatchHistory";
 import ProfilePage from "./pages/Profile";
 import AdminPage from "./pages/Admin";
 import NotFound from "./pages/NotFound";
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/search" element={<SearchPage />} />
               <Route path="/squad" element={<SquadPage />} />
               <Route path="/leaderboard" element={<LeaderboardPage />} />
+              <Route path="/match-history" element={<MatchHistoryPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/admin" element={<AdminOnlyRoute />} />
             </Route>

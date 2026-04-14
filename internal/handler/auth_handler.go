@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/delta/fantasy-world-cup/internal/service"
 	"github.com/gin-gonic/gin"
@@ -30,7 +32,22 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	user, err := h.authService.Register(c.Request.Context(), req.Username, req.Email, req.Password)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "error al crear usuario"})
+		switch {
+		case errors.Is(err, service.ErrUsernameTaken):
+			c.JSON(http.StatusConflict, gin.H{"error": "Username already exists. Please choose another one."})
+		case errors.Is(err, service.ErrEmailTaken):
+			c.JSON(http.StatusConflict, gin.H{"error": "Email already exists. Please use another email."})
+		default:
+			msg := strings.ToLower(err.Error())
+			if strings.Contains(msg, "username") {
+				c.JSON(http.StatusConflict, gin.H{"error": "Username already exists. Please choose another one."})
+				return
+			}
+			if strings.Contains(msg, "email") {
+				c.JSON(http.StatusConflict, gin.H{"error": "Email already exists. Please use another email."})
+				return
+			}
+		}
 		return
 	}
 

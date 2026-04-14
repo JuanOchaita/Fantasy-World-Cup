@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { Trophy, Users, Search, LayoutDashboard, User, LogOut, Menu, X, ShieldCheck } from 'lucide-react';
+import { Trophy, Users, Search, LayoutDashboard, User, LogOut, Menu, X, ShieldCheck, History } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -9,6 +9,7 @@ const navItems = [
   { to: '/squad', label: 'Squad', icon: Users },
   { to: '/search', label: 'Players', icon: Search },
   { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+  { to: '/match-history', label: 'Match History', icon: History },
   { to: '/admin', label: 'Admin', icon: ShieldCheck },
   { to: '/profile', label: 'Profile', icon: User },
 ];

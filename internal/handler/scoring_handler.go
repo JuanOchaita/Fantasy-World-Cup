@@ -45,6 +45,29 @@ type myRankResponse struct {
 	Message   string  `json:"message,omitempty"`
 }
 
+type matchContributionResponse struct {
+	PlayerID     int32  `json:"player_id"`
+	PlayerName   string `json:"player_name"`
+	PointsEarned int32  `json:"points_earned"`
+}
+
+type matchHistoryItemResponse struct {
+	MatchID               int32                       `json:"match_id"`
+	TeamA                 string                      `json:"team_a"`
+	TeamB                 string                      `json:"team_b"`
+	ScoreA                int16                       `json:"score_a"`
+	ScoreB                int16                       `json:"score_b"`
+	PointsEarned          int32                       `json:"points_earned"`
+	TotalPointsAfterMatch int32                       `json:"total_points_after_match"`
+	ScoredAt              string                      `json:"scored_at"`
+	Contributions         []matchContributionResponse `json:"contributions"`
+}
+
+type matchHistoryResponse struct {
+	TotalAccumulatedPoints float64                    `json:"total_accumulated_points"`
+	Matches                []matchHistoryItemResponse `json:"matches"`
+}
+
 func (h *ScoringHandler) PostResult(c *gin.Context) {
 	var req matchResultRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -182,6 +205,88 @@ func (h *ScoringHandler) GetMyRank(c *gin.Context) {
 		Rank:      rankInfo.Rank,
 		Score:     rankInfo.Score,
 		GameWins:  gameWins,
+	})
+}
+
+func (h *ScoringHandler) GetMatchHistory(c *gin.Context) {
+	userIDRaw, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "usuario no autenticado"})
+		return
+	}
+
+	userID, ok := normalizeUserID(userIDRaw)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "formato inválido de user_id en contexto"})
+		return
+	}
+
+	history, err := h.repo.GetUserScoringHistory(c.Request.Context(), repository.GetUserScoringHistoryParams{
+		UserID: userID,
+		Limit:  500,
+		Offset: 0,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error al obtener historial de partidos"})
+		return
+	}
+
+	matches := make([]matchHistoryItemResponse, 0, len(history))
+	for _, row := range history {
+		contribRows, contribErr := h.repo.GetUserScoringHistoryByMatch(c.Request.Context(), repository.GetUserScoringHistoryByMatchParams{
+			UserID:  userID,
+			MatchID: row.MatchID,
+		})
+		if contribErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error al obtener desglose por jugadores"})
+			return
+		}
+
+		contributions := make([]matchContributionResponse, 0, len(contribRows))
+		for _, contrib := range contribRows {
+			playerName := ""
+			if contrib.ShortName.Valid {
+				playerName = contrib.ShortName.String
+			}
+			if playerName == "" && contrib.LongName.Valid {
+				playerName = contrib.LongName.String
+			}
+			if playerName == "" {
+				playerName = fmt.Sprintf("Player #%d", contrib.PlayerID)
+			}
+			contributions = append(contributions, matchContributionResponse{
+				PlayerID:     contrib.PlayerID,
+				PlayerName:   playerName,
+				PointsEarned: contrib.PointsEarned,
+			})
+		}
+
+		matches = append(matches, matchHistoryItemResponse{
+			MatchID:               row.MatchID,
+			TeamA:                 row.TeamA,
+			TeamB:                 row.TeamB,
+			ScoreA:                row.ScoreA,
+			ScoreB:                row.ScoreB,
+			PointsEarned:          row.PointsEarned,
+			TotalPointsAfterMatch: row.TotalPointsAfterMatch,
+			ScoredAt:              row.ScoredAt.Format("2006-01-02 15:04:05"),
+			Contributions:         contributions,
+		})
+	}
+
+	total := float64(0)
+	if len(matches) > 0 {
+		total = float64(matches[0].TotalPointsAfterMatch)
+	} else {
+		squad, squadErr := h.repo.GetSquadByUserID(c.Request.Context(), userID)
+		if squadErr == nil {
+			total = nullInt32ToFloat64(squad.TotalPoints)
+		}
+	}
+
+	c.JSON(http.StatusOK, matchHistoryResponse{
+		TotalAccumulatedPoints: total,
+		Matches:                matches,
 	})
 }
 
