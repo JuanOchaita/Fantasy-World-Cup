@@ -21,6 +21,19 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
+func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next(w, r)
+	}
+}
+
 func playerHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -68,7 +81,7 @@ func main() {
 		log.Fatalf("failed to connect to redis: %v", err)
 	}
 
-	http.HandleFunc("/player", playerHandler)
+	http.HandleFunc("/player", corsMiddleware(playerHandler))
 
 	log.Printf("server listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
