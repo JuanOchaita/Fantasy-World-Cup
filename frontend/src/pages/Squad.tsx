@@ -241,6 +241,16 @@ const SquadPage = () => {
           </div>
         </div>
 
+        <div className="glass-card rounded-xl p-4 border border-primary/20 bg-primary/5">
+          <p className="text-sm text-foreground">
+            To add players, go to the{' '}
+            <Link to="/search" className="text-primary hover:underline font-medium">
+              Players
+            </Link>{' '}
+            page. This Squad page is for editing squad name, changing formation, and removing players.
+          </p>
+        </div>
+
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <div className="glass-card rounded-lg px-4 py-3">
             <p className="text-xs text-muted-foreground">Formation</p>

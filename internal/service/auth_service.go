@@ -86,17 +86,21 @@ func (s *AuthService) Register(ctx context.Context, username, email, password st
 	return user, nil
 }
 
-func (s *AuthService) Login(ctx context.Context, email, password string) (TokenPair, error) {
+func (s *AuthService) Login(ctx context.Context, email, password string) (TokenPair, repository.User, error) {
 	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
-		return TokenPair{}, errors.New("credenciales invalidas")
+		return TokenPair{}, repository.User{}, errors.New("credenciales invalidas")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return TokenPair{}, errors.New("credenciales invalidas")
+		return TokenPair{}, repository.User{}, errors.New("credenciales invalidas")
 	}
 
-	return s.GenerateTokenPair(ctx, user.UserID)
+	tokens, err := s.GenerateTokenPair(ctx, user.UserID)
+	if err != nil {
+		return TokenPair{}, repository.User{}, err
+	}
+	return tokens, user, nil
 }
 
 func (s *AuthService) GenerateTokenPair(ctx context.Context, userID int32) (TokenPair, error) {

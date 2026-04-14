@@ -13,6 +13,45 @@ export interface Player {
   positionSlot?: string;
 }
 
+export interface RedisPlayerSuggestion {
+  id: number;
+  name: string;
+}
+
+export interface ExternalSearchResult {
+  player_id: number;
+  long_name: string;
+  nationality_name: string;
+  club_name: string;
+  player_positions: string;
+  overall: number;
+  value_eur: number;
+}
+
+export interface ExternalSearchResponse {
+  pagination: {
+    current_page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+  };
+  query: string;
+  results: ExternalSearchResult[];
+  took_ms: number;
+}
+
+export interface ExternalPlayerDetail {
+  player_id: number;
+  long_name?: string;
+  short_name?: string;
+  nationality_name?: string;
+  club_name?: string;
+  player_positions?: string;
+  overall?: number;
+  value_eur?: number;
+  player_face_url?: string;
+}
+
 /** Single player from GET /players (with fantasy_price). */
 export interface PlayerApiRow {
   player_id: number;
@@ -88,4 +127,42 @@ export const playerService = {
     Promise.reject(new Error('Server-side player search is not connected')),
 
   getById: (_id: string) => Promise.reject(new Error('GET /players/:id is not available on the API')),
+
+  suggestByName: async (key: string): Promise<RedisPlayerSuggestion[]> => {
+    const url = `http://localhost:8081/redis?key=${encodeURIComponent(key)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Suggestions HTTP ${res.status}`);
+    return (await res.json()) as RedisPlayerSuggestion[];
+  },
+
+  searchAdvanced: async (params: {
+    q: string;
+    page: number;
+    size?: number;
+    nationality?: string;
+    position?: string;
+    club?: string;
+    min_overall?: number;
+    max_overall?: number;
+  }): Promise<ExternalSearchResponse> => {
+    const qs = new URLSearchParams();
+    qs.set('q', params.q);
+    qs.set('page', String(params.page));
+    qs.set('size', String(params.size ?? 50));
+    if (params.nationality) qs.set('nationality', params.nationality);
+    if (params.position) qs.set('position', params.position);
+    if (params.club) qs.set('club', params.club);
+    if (typeof params.min_overall === 'number') qs.set('min_overall', String(params.min_overall));
+    if (typeof params.max_overall === 'number') qs.set('max_overall', String(params.max_overall));
+
+    const res = await fetch(`http://localhost:8083/search/players?${qs.toString()}`);
+    if (!res.ok) throw new Error(`Search HTTP ${res.status}`);
+    return (await res.json()) as ExternalSearchResponse;
+  },
+
+  getDetailById: async (playerId: number): Promise<ExternalPlayerDetail> => {
+    const res = await fetch(`http://localhost:8082/player?name=${encodeURIComponent(String(playerId))}`);
+    if (!res.ok) throw new Error(`Player detail HTTP ${res.status}`);
+    return (await res.json()) as ExternalPlayerDetail;
+  },
 };

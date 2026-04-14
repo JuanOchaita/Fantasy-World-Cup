@@ -1,4 +1,4 @@
-import request, { setStoredAuthUser, setStoredRefreshToken, getStoredAuthUser } from './api';
+import request, { setStoredAuthUser, setStoredRefreshToken, getStoredAuthUser, getStoredRefreshToken } from './api';
 import { jwtExpMs, jwtUserId } from '@/lib/jwt';
 
 export interface AuthUser {
@@ -29,27 +29,29 @@ interface TokenPair {
   access_token: string;
   refresh_token: string;
 }
-
-function userFromLogin(email: string, accessToken: string): AuthUser {
-  const id = jwtUserId(accessToken);
-  return {
-    id: id ?? '',
-    username: email.split('@')[0] || 'player',
-    email,
+interface LoginResponse extends TokenPair {
+  user: {
+    id: number | string;
+    username: string;
+    email: string;
   };
 }
 
 export const authService = {
   login: async (data: LoginPayload) => {
-    const tokens = await request<TokenPair>('/auth/login', {
+    const res = await request<LoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email: data.email, password: data.password }),
     });
-    const user = userFromLogin(data.email, tokens.access_token);
-    localStorage.setItem('auth_token', tokens.access_token);
-    setStoredRefreshToken(tokens.refresh_token);
+    const user: AuthUser = {
+      id: String(res.user.id),
+      username: res.user.username,
+      email: res.user.email,
+    };
+    localStorage.setItem('auth_token', res.access_token);
+    setStoredRefreshToken(res.refresh_token);
     setStoredAuthUser(user);
-    return { token: tokens.access_token, user };
+    return { token: res.access_token, user };
   },
 
   register: async (data: RegisterPayload) => {
@@ -73,11 +75,21 @@ export const authService = {
     return { token, user: merged };
   },
 
-  verifySession: () => {
-    const token = localStorage.getItem('auth_token');
+  verifySession: async () => {
+    let token = localStorage.getItem('auth_token');
     if (!token) throw new Error('No session');
     const exp = jwtExpMs(token);
-    if (!exp || exp < Date.now()) throw new Error('Expired');
+    if (!exp || exp < Date.now()) {
+      const refreshToken = getStoredRefreshToken();
+      if (!refreshToken) throw new Error('Expired');
+      const refreshed = await request<TokenPair>('/auth/refresh', {
+        method: 'POST',
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      token = refreshed.access_token;
+      localStorage.setItem('auth_token', refreshed.access_token);
+      setStoredRefreshToken(refreshed.refresh_token);
+    }
     const user = getStoredAuthUser();
     if (user) return { user };
     const id = jwtUserId(token);

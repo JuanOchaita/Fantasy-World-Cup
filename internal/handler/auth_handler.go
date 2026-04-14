@@ -70,13 +70,21 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	tokens, err := h.authService.Login(c.Request.Context(), req.Email, req.Password)
+	tokens, user, err := h.authService.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, tokens)
+	c.JSON(http.StatusOK, gin.H{
+		"access_token":  tokens.AccessToken,
+		"refresh_token": tokens.RefreshToken,
+		"user": gin.H{
+			"id":       user.UserID,
+			"username": user.Username,
+			"email":    user.Email,
+		},
+	})
 }
 
 func (h *AuthHandler) Refresh(c *gin.Context) {
