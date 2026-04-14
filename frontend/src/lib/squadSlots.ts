@@ -1,31 +1,98 @@
-/** Slot keys must match what we send to POST /squad/players and what the API returns in position_slot. */
-export const SLOT_ORDER_433 = ['GK', 'D1', 'D2', 'D3', 'D4', 'M1', 'M2', 'M3', 'F1', 'F2', 'F3'] as const;
+export type Position = 'GK' | 'DEF' | 'MID' | 'FWD';
 
-export type SlotKey = (typeof SLOT_ORDER_433)[number];
+export const FORMATION_OPTIONS = ['4-3-3', '4-4-2', '3-5-2', '3-4-3', '5-3-2', '5-4-1'] as const;
+export type Formation = (typeof FORMATION_OPTIONS)[number];
 
-export function firstEmptySlot(filledSlots: Iterable<string>): string | null {
-  const set = new Set(filledSlots);
-  for (const s of SLOT_ORDER_433) {
-    if (!set.has(s)) return s;
+export interface FormationShape {
+  DEF: number;
+  MID: number;
+  FWD: number;
+}
+
+export interface SlotLayout {
+  slot: string;
+  posLabel: Position;
+  top: string;
+  left: string;
+}
+
+const DEFAULT_SHAPE: FormationShape = { DEF: 4, MID: 3, FWD: 3 };
+
+function parseFormation(formation: string): FormationShape {
+  const m = formation.match(/^(\d)-(\d)-(\d)$/);
+  if (!m) return DEFAULT_SHAPE;
+  const DEF = Number(m[1]);
+  const MID = Number(m[2]);
+  const FWD = Number(m[3]);
+  if (DEF + MID + FWD !== 10) return DEFAULT_SHAPE;
+  return { DEF, MID, FWD };
+}
+
+function linePositions(count: number): string[] {
+  if (count <= 1) return ['50%'];
+  const pad = 15;
+  const usable = 100 - pad * 2;
+  const step = usable / (count - 1);
+  return Array.from({ length: count }, (_, i) => `${pad + i * step}%`);
+}
+
+export function getFormationShape(formation: string): FormationShape {
+  return parseFormation(formation);
+}
+
+export function getFormationSlots(formation: string): string[] {
+  const shape = parseFormation(formation);
+  const slots: string[] = ['GK'];
+  for (let i = 1; i <= shape.DEF; i += 1) slots.push(`D${i}`);
+  for (let i = 1; i <= shape.MID; i += 1) slots.push(`M${i}`);
+  for (let i = 1; i <= shape.FWD; i += 1) slots.push(`F${i}`);
+  return slots;
+}
+
+export function getPitchLayout(formation: string): SlotLayout[] {
+  const shape = parseFormation(formation);
+  const layout: SlotLayout[] = [{ slot: 'GK', posLabel: 'GK', top: '82%', left: '50%' }];
+
+  linePositions(shape.DEF).forEach((left, i) => {
+    layout.push({ slot: `D${i + 1}`, posLabel: 'DEF', top: '62%', left });
+  });
+  linePositions(shape.MID).forEach((left, i) => {
+    layout.push({ slot: `M${i + 1}`, posLabel: 'MID', top: '38%', left });
+  });
+  linePositions(shape.FWD).forEach((left, i) => {
+    layout.push({ slot: `F${i + 1}`, posLabel: 'FWD', top: '15%', left });
+  });
+
+  return layout;
+}
+
+export function countPlayersByPositionFromSlots(filledSlots: Iterable<string>): Record<Position, number> {
+  const result: Record<Position, number> = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
+  for (const s of filledSlots) {
+    if (!s) continue;
+    if (s === 'GK') result.GK += 1;
+    else if (s.startsWith('D')) result.DEF += 1;
+    else if (s.startsWith('M')) result.MID += 1;
+    else if (s.startsWith('F')) result.FWD += 1;
+  }
+  return result;
+}
+
+export function firstEmptySlotForPosition(
+  formation: string,
+  filledSlots: Iterable<string>,
+  position: Position
+): string | null {
+  const filled = new Set(filledSlots);
+  const slots = getFormationSlots(formation);
+  const acceptedPrefix = position === 'GK' ? 'GK' : position === 'DEF' ? 'D' : position === 'MID' ? 'M' : 'F';
+
+  for (const slot of slots) {
+    if (position === 'GK') {
+      if (slot === 'GK' && !filled.has(slot)) return slot;
+      continue;
+    }
+    if (slot.startsWith(acceptedPrefix) && !filled.has(slot)) return slot;
   }
   return null;
 }
-
-export const pitchLayout433: {
-  slot: SlotKey;
-  posLabel: string;
-  top: string;
-  left: string;
-}[] = [
-  { slot: 'GK', posLabel: 'GK', top: '82%', left: '50%' },
-  { slot: 'D1', posLabel: 'DEF', top: '62%', left: '15%' },
-  { slot: 'D2', posLabel: 'DEF', top: '62%', left: '38%' },
-  { slot: 'D3', posLabel: 'DEF', top: '62%', left: '62%' },
-  { slot: 'D4', posLabel: 'DEF', top: '62%', left: '85%' },
-  { slot: 'M1', posLabel: 'MID', top: '38%', left: '25%' },
-  { slot: 'M2', posLabel: 'MID', top: '38%', left: '50%' },
-  { slot: 'M3', posLabel: 'MID', top: '38%', left: '75%' },
-  { slot: 'F1', posLabel: 'FWD', top: '15%', left: '25%' },
-  { slot: 'F2', posLabel: 'FWD', top: '15%', left: '50%' },
-  { slot: 'F3', posLabel: 'FWD', top: '15%', left: '75%' },
-];

@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/components/AppLayout';
 import { playerService, mapPlayerApiRow, type Player } from '@/services/players';
-import { squadService } from '@/services/squad';
-import { firstEmptySlot } from '@/lib/squadSlots';
+import { mapSquadDetails, squadService } from '@/services/squad';
+import { firstEmptySlotForPosition, getFormationShape, getFormationSlots } from '@/lib/squadSlots';
 import { useToast } from '@/hooks/use-toast';
 
 const positions = ['All', 'GK', 'DEF', 'MID', 'FWD'] as const;
@@ -66,10 +66,32 @@ const SearchPage = () => {
     setAddingId(player.id);
     try {
       const details = await squadService.getDetails();
-      const filled = new Set(details.players.map(p => p.position_slot || '').filter(Boolean));
-      const slot = firstEmptySlot(filled);
+      const squad = mapSquadDetails(details);
+      const formation = squad.formation || '4-3-3';
+      const filled = new Set(squad.players.map(p => p.positionSlot || '').filter(Boolean));
+      const totalSlots = getFormationSlots(formation).length;
+      if (filled.size >= totalSlots) {
+        toast({ title: 'Squad full', description: `Your ${formation} already has 11 players.`, variant: 'destructive' });
+        return;
+      }
+
+      const shape = getFormationShape(formation);
+      const positionLabel =
+        player.position === 'GK'
+          ? 'GK'
+          : player.position === 'DEF'
+          ? `DEF (${shape.DEF})`
+          : player.position === 'MID'
+          ? `MID (${shape.MID})`
+          : `FWD (${shape.FWD})`;
+
+      const slot = firstEmptySlotForPosition(formation, filled, player.position);
       if (!slot) {
-        toast({ title: 'Squad full', description: 'Remove a player or use a different squad.', variant: 'destructive' });
+        toast({
+          title: 'Position full',
+          description: `No free slot for ${positionLabel} in ${formation}.`,
+          variant: 'destructive',
+        });
         return;
       }
       await squadService.addPlayer(Number(player.id), slot);

@@ -5,7 +5,7 @@ import { Users, DollarSign, Loader2 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import { squadService, mapSquadDetails } from '@/services/squad';
 import type { Squad } from '@/services/squad';
-import { pitchLayout433 } from '@/lib/squadSlots';
+import { FORMATION_OPTIONS, getFormationShape, getPitchLayout } from '@/lib/squadSlots';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -15,16 +15,19 @@ const SquadPage = () => {
   const [squad, setSquad] = useState<Squad | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [newName, setNewName] = useState('My Squad');
   const [formation, setFormation] = useState('4-3-3');
 
   const load = async () => {
     setLoading(true);
     try {
-      // POST /squad is GetOrCreate in backend; this avoids initial 404 on first visit.
-      await squadService.ensureSquad({ name: newName.trim() || 'My Squad', formation });
       const raw = await squadService.getDetails();
-      setSquad(mapSquadDetails(raw));
+      const mapped = mapSquadDetails(raw);
+      setSquad(mapped);
+      setNewName(mapped.name);
+      setFormation(mapped.formation);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to load squad';
       const m = msg.toLowerCase();
@@ -61,6 +64,30 @@ const SquadPage = () => {
     }
   };
 
+  const handleSaveProfile = async () => {
+    if (!squad) return;
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      toast({ title: 'Invalid name', description: 'Please enter a squad name.', variant: 'destructive' });
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      await squadService.updateProfile({ name: trimmedName, formation });
+      await load();
+      setEditing(false);
+      toast({ title: 'Squad updated', description: 'Name and formation were updated.' });
+    } catch (e) {
+      toast({
+        title: 'Could not update squad',
+        description: e instanceof Error ? e.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   if (loading) {
     return (
       <AppLayout>
@@ -85,7 +112,22 @@ const SquadPage = () => {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Formation</label>
-              <Input value={formation} onChange={e => setFormation(e.target.value)} className="bg-muted/50 border-border/50" />
+              <div className="grid grid-cols-3 gap-2">
+                {FORMATION_OPTIONS.map(opt => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setFormation(opt)}
+                    className={`rounded-md px-3 py-2 text-sm border transition-colors ${
+                      formation === opt
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted/40 text-muted-foreground border-border/50 hover:text-foreground'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
             </div>
             <Button onClick={handleCreate} disabled={creating} className="w-full btn-gold">
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create squad'}
@@ -98,6 +140,8 @@ const SquadPage = () => {
 
   const count = squad.players.length;
   const spent = squad.budget - squad.budgetRemaining;
+  const shape = getFormationShape(squad.formation);
+  const pitchLayout = getPitchLayout(squad.formation);
 
   return (
     <AppLayout>
@@ -106,6 +150,9 @@ const SquadPage = () => {
           <div>
             <h1 className="text-3xl text-gold-gradient">{squad.name}</h1>
             <p className="text-muted-foreground mt-1">Formation: {squad.formation}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              DEF {shape.DEF} · MID {shape.MID} · FWD {shape.FWD}
+            </p>
           </div>
           <div className="flex gap-4">
             <div className="glass-card rounded-lg px-4 py-2 flex items-center gap-2">
@@ -116,8 +163,51 @@ const SquadPage = () => {
               <DollarSign className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium text-foreground">£{squad.budgetRemaining.toFixed(1)}m left</span>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-border/50"
+              onClick={() => {
+                setNewName(squad.name);
+                setFormation(squad.formation);
+                setEditing(v => !v);
+              }}
+            >
+              {editing ? 'Cancel edit' : 'Edit squad'}
+            </Button>
           </div>
         </div>
+
+        {editing && (
+          <div className="glass-card rounded-xl p-6 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Squad name</label>
+              <Input value={newName} onChange={e => setNewName(e.target.value)} className="bg-muted/50 border-border/50" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Formation</label>
+              <div className="grid grid-cols-3 gap-2">
+                {FORMATION_OPTIONS.map(opt => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setFormation(opt)}
+                    className={`rounded-md px-3 py-2 text-sm border transition-colors ${
+                      formation === opt
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted/40 text-muted-foreground border-border/50 hover:text-foreground'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Button type="button" onClick={handleSaveProfile} disabled={savingProfile} className="btn-gold">
+              {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save changes'}
+            </Button>
+          </div>
+        )}
 
         <div className="glass-card rounded-xl overflow-hidden">
           <div
@@ -128,7 +218,7 @@ const SquadPage = () => {
             <div className="absolute left-1/2 top-4 bottom-4 w-px bg-foreground/10" />
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full border-2 border-foreground/10" />
 
-            {pitchLayout433.map(({ slot, posLabel, top, left }) => {
+            {pitchLayout.map(({ slot, posLabel, top, left }) => {
               const pl = squad.players.find(p => p.positionSlot === slot);
               const label = pl ? pl.name.split(' ').slice(0, 2).join(' ') : '';
               return (
@@ -161,7 +251,7 @@ const SquadPage = () => {
           <Link to="/search" className="text-primary hover:underline">
             Player Search
           </Link>{' '}
-          to add players (first free slot is filled automatically).
+          to add players according to your formation slots.
         </p>
       </motion.div>
     </AppLayout>

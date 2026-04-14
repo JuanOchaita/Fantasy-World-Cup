@@ -128,4 +128,10 @@ export const squadService = {
       method: 'PATCH',
       body: JSON.stringify({ formation }),
     }),
+
+  updateProfile: (data: { name: string; formation: string }) =>
+    request<ApiSquadRow>('/squad', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
 };

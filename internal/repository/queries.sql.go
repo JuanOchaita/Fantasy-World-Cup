@@ -1484,3 +1484,31 @@ func (q *Queries) UpdateSquadFormation(ctx context.Context, arg UpdateSquadForma
 	)
 	return i, err
 }
+
+const updateSquadProfile = `-- name: UpdateSquadProfile :one
+UPDATE squad
+SET squad_name = $2,
+    formation = $3
+WHERE squad_id = $1
+RETURNING squad_id, user_id, squad_name, formation, budget_used, total_points
+`
+
+type UpdateSquadProfileParams struct {
+	SquadID   int32          `json:"squad_id"`
+	SquadName string         `json:"squad_name"`
+	Formation sql.NullString `json:"formation"`
+}
+
+func (q *Queries) UpdateSquadProfile(ctx context.Context, arg UpdateSquadProfileParams) (Squad, error) {
+	row := q.queryRow(ctx, q.updateSquadProfileStmt, updateSquadProfile, arg.SquadID, arg.SquadName, arg.Formation)
+	var i Squad
+	err := row.Scan(
+		&i.SquadID,
+		&i.UserID,
+		&i.SquadName,
+		&i.Formation,
+		&i.BudgetUsed,
+		&i.TotalPoints,
+	)
+	return i, err
+}

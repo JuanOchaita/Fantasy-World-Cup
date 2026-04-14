@@ -114,6 +114,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateSquadFormationStmt, err = db.PrepareContext(ctx, updateSquadFormation); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateSquadFormation: %w", err)
 	}
+	if q.updateSquadProfileStmt, err = db.PrepareContext(ctx, updateSquadProfile); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateSquadProfile: %w", err)
+	}
 	return &q, nil
 }
 
@@ -269,6 +272,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateSquadFormationStmt: %w", cerr)
 		}
 	}
+	if q.updateSquadProfileStmt != nil {
+		if cerr := q.updateSquadProfileStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateSquadProfileStmt: %w", cerr)
+		}
+	}
 	return err
 }
 
@@ -338,6 +346,7 @@ type Queries struct {
 	updatePointsForNationStmt         *sql.Stmt
 	updateSquadBudgetStmt             *sql.Stmt
 	updateSquadFormationStmt          *sql.Stmt
+	updateSquadProfileStmt            *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
@@ -374,5 +383,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		updatePointsForNationStmt:         q.updatePointsForNationStmt,
 		updateSquadBudgetStmt:             q.updateSquadBudgetStmt,
 		updateSquadFormationStmt:          q.updateSquadFormationStmt,
+		updateSquadProfileStmt:            q.updateSquadProfileStmt,
 	}
 }

@@ -143,6 +143,26 @@ func (s *SquadService) ChangeFormation(ctx context.Context, userID int32, format
 	})
 }
 
+func (s *SquadService) UpdateProfile(ctx context.Context, userID int32, name, formation string) (repository.Squad, error) {
+	squad, err := s.repo.GetSquadByUserID(ctx, userID)
+	if err != nil {
+		return repository.Squad{}, errors.New("escuadra no encontrada")
+	}
+
+	if name == "" {
+		return repository.Squad{}, errors.New("el nombre de la escuadra es requerido")
+	}
+	if formation == "" {
+		return repository.Squad{}, errors.New("la formacion es requerida")
+	}
+
+	return s.repo.UpdateSquadProfile(ctx, repository.UpdateSquadProfileParams{
+		SquadID:   squad.SquadID,
+		SquadName: name,
+		Formation: &formation,
+	})
+}
+
 func (s *SquadService) AddPlayer(ctx context.Context, userID int32, playerID int32, slot string) error {
 	squad, err := s.repo.GetSquadByUserID(ctx, userID)
 	if err != nil {

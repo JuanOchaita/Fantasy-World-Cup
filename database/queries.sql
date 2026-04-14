@@ -51,6 +51,13 @@ SET formation = $2
 WHERE squad_id = $1
 RETURNING *;
 
+-- name: UpdateSquadProfile :one
+UPDATE squad
+SET squad_name = $2,
+    formation = $3
+WHERE squad_id = $1
+RETURNING *;
+
 -- name: CountPlayersInSquad :one
 SELECT COUNT(*) FROM squad_player
 WHERE squad_id = $1;

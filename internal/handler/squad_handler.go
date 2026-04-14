@@ -87,3 +87,24 @@ func (h *SquadHandler) ChangeFormation(c *gin.Context) {
 
 	c.JSON(http.StatusOK, squad)
 }
+
+func (h *SquadHandler) UpdateProfile(c *gin.Context) {
+	userID := c.MustGet("user_id").(int32)
+	type updateReq struct {
+		Name      string `json:"name" binding:"required"`
+		Formation string `json:"formation" binding:"required"`
+	}
+	var req updateReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	squad, err := h.squadService.UpdateProfile(c.Request.Context(), userID, req.Name, req.Formation)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, squad)
+}
