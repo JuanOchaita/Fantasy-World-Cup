@@ -2,57 +2,53 @@
 set -e
 cd "$(dirname "$0")/.."
 
-echo "--- POBLANDO BASE DE DATOS (SEEDING) ---"
+echo "--- POBLANDO BASE DE DATOS (ADMIN + 10 USUARIOS) ---"
 
-# Cargar variables de entorno de forma robusta
+# 1. Cargar variables de entorno
 if [ -f .env ]; then
     set -a
-    # Sed elimina comentarios al final de la linea y lineas vacias antes de hacer el source
     source <(sed -e 's/\s*#.*$//' -e '/^$/d' .env)
     set +a
 fi
 
-# Verificar variables criticas
-if [ -z "$ADMIN_USERNAME" ]; then
-    echo "Error: ADMIN_USERNAME no está definido en el .env"
-    exit 1
-fi
-
-# 1. Crear el usuario Administrador
-echo "Creando usuario administrador: $ADMIN_USERNAME..."
-docker exec -i db-lab-postgres psql -U admin -d labdb -c "
-INSERT INTO users (username, email, password_hash) 
-VALUES ('$ADMIN_USERNAME', '$ADMIN_EMAIL', 'admin_hash_placeholder')
-ON CONFLICT (username) DO NOTHING;"
-
-# 2. Insertar usuarios y escuadras de prueba
-echo "Insertando usuarios y escuadras de prueba..."
+# 2. Limpiar base de datos
+echo "Limpiando base de datos..."
 docker exec -i db-lab-postgres psql -U admin -d labdb <<EOF
--- Limpiar datos previos
 TRUNCATE TABLE squad_player, squad, users RESTART IDENTITY CASCADE;
-
--- Re-insertar Admin
-INSERT INTO users (username, email, password_hash) VALUES ('$ADMIN_USERNAME', '$ADMIN_EMAIL', 'x');
-
--- Usuarios de prueba
-INSERT INTO users (username, email, password_hash) VALUES 
-('user1', 'user1@test.com', 'x'),
-('user2', 'user2@test.com', 'x'),
-('user3', 'user3@test.com', 'x');
-
--- Escuadras
-INSERT INTO squad (user_id, squad_name, formation, total_points) VALUES 
-(2, 'Brasil Squad', '4-3-3', 10),
-(3, 'Argentina Squad', '4-4-2', 15),
-(4, 'Germany Squad', '3-5-2', 5);
-
--- Asignar algunos jugadores a Brasil (ID nacion 54)
-INSERT INTO squad_player (squad_id, player_id, position_slot)
-SELECT 1, player_id, 'ST' FROM players WHERE nationality_id = 54 LIMIT 3;
 EOF
 
-# 3. Sincronizar Redis
-echo "Sincronizando ranking en Redis..."
+# 3. Registrar Administrador a través de la API
+echo "Registrando administrador via API: $ADMIN_USERNAME..."
+curl -s -X POST http://localhost:8080/api/v1/auth/register \
+     -H "Content-Type: application/json" \
+     -d "{\"username\": \"$ADMIN_USERNAME\", \"email\": \"$ADMIN_EMAIL\", \"password\": \"$ADMIN_PASSWORD\"}"
+echo ""
+
+# 4. Insertar usuarios y escuadras de prueba (Directo en DB para velocidad)
+echo "Insertando usuarios y escuadras de prueba..."
+docker exec -i db-lab-postgres psql -U admin -d labdb <<EOF
+-- Usuarios de prueba
+INSERT INTO users (username, email, password_hash)
+SELECT 'user_' || i, 'user' || i || '@example.com', 'x'
+FROM generate_series(1, 10) s(i);
+
+-- Escuadras
+INSERT INTO squad (user_id, squad_name, formation, total_points)
+SELECT user_id, 'Squad de ' || username, '4-3-3', (random() * 100)::int
+FROM users WHERE username != '$ADMIN_USERNAME';
+
+-- Jugadores en escuadras
+DO \$\$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT squad_id FROM squad LOOP
+        INSERT INTO squad_player (squad_id, player_id, position_slot)
+        SELECT r.squad_id, player_id, 'ANY' FROM players ORDER BY random() LIMIT 3;
+    END LOOP;
+END \$\$;
+EOF
+
+echo "Sincronizando Redis..."
 docker restart fantasy-world-cup-api
 
-echo "Seeding completado."
+echo "✅ Seeding completado."

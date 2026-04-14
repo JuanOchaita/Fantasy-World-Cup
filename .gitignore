@@ -30,3 +30,8 @@ vendor/
 # OS
 .DS_Store
 Thumbs.db
+
+# front
+node_modules/
+dist/
+frontend/.vite/deps/

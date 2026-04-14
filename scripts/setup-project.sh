@@ -1,16 +1,20 @@
 #!/bin/bash
+# FANTASY WORLD CUP - SETUP SCRIPT (MASTER PORTABLE)
 set -e
 cd "$(dirname "$0")/.."
 
 echo "--- CONFIGURANDO ENTORNO ---"
+
 if [ ! -f .env ]; then
+    echo "Creando .env..."
     cp .env.example .env
-    sed -i '' 's/localhost/127.0.0.1/g' .env
+    sed -i 's/localhost/127.0.0.1/g' .env
 fi
 
-# Recrear main.go con Sincronización Automática de Redis
-mkdir -p cmd/server
-cat <<'EOF' > cmd/server/main.go
+if [ ! -f cmd/server/main.go ]; then
+    echo "Generando main.go..."
+    mkdir -p cmd/server
+    cat <<'EOF' > cmd/server/main.go
 package main
 
 import (
@@ -48,7 +52,6 @@ func main() {
 	squadSvc := service.NewSquadService(q, playerSvc)
 	scoreSvc := service.NewScoringService(q, conn.Redis)
 
-	// Sincronización inicial de Redis (Vital para Dashboard)
 	scoreSvc.SyncLeaderboardToRedis(context.Background())
 
 	authH := handler.NewAuthHandler(authSvc)
@@ -58,6 +61,8 @@ func main() {
 
 	r := gin.Default()
 	r.Use(CORSMiddleware())
+	
+	// Servir Frontend (Rutas consistentes con start-project.sh)
 	r.StaticFile("/web", "./frontend/index.html")
 	r.StaticFile("/web/", "./frontend/index.html")
 	r.Static("/web/static", "./frontend")
@@ -80,9 +85,14 @@ func main() {
 			v1.POST("/admin/results", scoreH.PostResult)
 		}
 	}
+
+	r.GET("/health", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
 	r.Run(":" + port)
 }
 EOF
+fi
 
-if command -v sqlc >/dev/null 2>&1; then sqlc generate; else $HOME/go_dist/go/bin/sqlc generate; fi
-echo "Configuración finalizada."
+echo "--- GENERANDO REPOSITORIO (DOCKER) ---"
+docker run --rm -v "$(pwd):/src" -w /src sqlc/sqlc generate
+
+echo "✅ Portabilidad garantizada."

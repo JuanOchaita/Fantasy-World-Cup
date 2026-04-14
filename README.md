@@ -1,37 +1,43 @@
-# Fantasy World Cup 2026 - Backend Go
+# Fantasy World Cup 2026 - Plataforma Políglota
 
-Plataforma de Fantasy Football de alto rendimiento para el Mundial 2026, construida con Go, PostgreSQL 18 y Redis.
+Ecosistema completo de Fantasy Football escalable, con búsqueda instantánea y procesamiento en tiempo real.
 
-## Instalación
-Para comenzar rápidamente, consulta la [Guía de Instalación (INSTALL.md)](INSTALL.md).
+## 🚀 Inicio Rápido (Un solo comando)
 
-## Arquitectura del Sistema
+Gracias a la dockerización total, puedes levantar la plataforma completa (Frontend, Backend y Servicios de Búsqueda) con:
 
-El backend sigue una arquitectura de **n-capas (N-tier)** para asegurar escalabilidad:
-
-- **Capa de Repositorio (`internal/repository`)**: Acceso a datos tipo-seguro generado automáticamente por `sqlc`.
-- **Capa de Servicio (`internal/service`)**: Contiene la lógica de negocio (validación de reglas, cálculo de puntos, gestión de escuadra).
-- **Capa de Handler (`internal/handler`)**: Controladores Gin que exponen los endpoints REST y validan los DTOs de entrada.
-- **Capa de Middleware (`internal/middleware`)**: Gestión de autenticación JWT y control de acceso.
-
-## Integración con Otros Módulos
-
-El backend actúa como el núcleo orquestador del ecosistema:
-
-- **Búsqueda (Search DB)**: El endpoint `GET /players` está diseñado para delegar la búsqueda pesada a un servicio externo. *Punto de integración: `internal/service/player_service.go`*.
-- **Dashboard y Leaderboards**: El sistema publica actualizaciones de puntaje hacia Redis. El módulo de Dashboard DB consume estos datos desde Redis para mostrar rankings en tiempo real. *Punto de integración: `internal/service/scoring_service.go`*.
-- **Frontend (UI/UX)**: Comunicación vía API REST siguiendo el contrato definido en `frontend/app.js`.
-
-## Estructura de Archivos
-```text
-├── Makefile             # Interfaz unificada de comandos
-├── INSTALL.md           # Guía de instalación y replicación
-├── cmd/server/main.go   # Punto de entrada (Configuración del servidor y rutas)
-├── database/            # Esquema SQL, Queries (sqlc) y Datos (CSV)
-├── Dockerfile           # Build multi-etapa contenedorizado
-├── frontend/            # Cliente web de pruebas (Contrato de API)
-├── internal/            # Lógica central (Handler, Middleware, Repo, Service)
-├── pkg/                 # Utilidades compartidas (Conexión DB)
-├── scripts/             # Scripts de soporte
-└── docker-compose.yml   # Orquestación de infraestructura (Postgres, Redis)
+```bash
+make build
 ```
+
+*(Esto ejecutará la configuración del entorno y el levantamiento de Docker)*.
+
+## 🏗️ Arquitectura Políglota
+
+La plataforma utiliza múltiples motores para maximizar el rendimiento:
+
+- **Core Backend (Go/Gin)**: Gestión de reglas de negocio, usuarios y escuadras.
+- **Persistencia (PostgreSQL 18)**: Datos maestros de jugadores y usuarios.
+- **Cache & Leaderboard (Redis 7)**: Ranking mundial instantáneo y sesiones.
+- **Búsqueda Avanzada (Elasticsearch 8)**: Motor de búsqueda de texto completo para jugadores.
+- **Búsqueda Rápida (Redis AC)**: Microservicio de autocompletado ultra-rápido.
+- **Frontend Moderno (React/Vite)**: Interfaz de usuario de última generación.
+
+## 🔗 Mapa de Puertos y Servicios
+
+| Servicio | URL Local | Descripción |
+| :--- | :--- | :--- |
+| **Frontend** | [http://localhost:5173](http://localhost:5173) | UI Principal de la plataforma. |
+| **Backend API** | [http://localhost:8080](http://localhost:8080/api/v1) | API Core del sistema. |
+| **Search (ES)** | [http://localhost:8083](http://localhost:8083) | Búsqueda vía Elasticsearch. |
+| **Autocomplete**| [http://localhost:8081](http://localhost:8081) | Búsqueda vía Redis Sorted Sets. |
+| **Player Info** | [http://localhost:8082](http://localhost:8082) | Información extendida vía Redis. |
+
+## 🛠️ Herramientas de Control
+
+Usa los comandos `make` para gestionar el ciclo de vida:
+- `make setup`: Prepara archivos `.env` y modelos de base de datos.
+- `make start`: Levanta todo el ecosistema Docker.
+- `make stop`: Apaga y limpia la infraestructura.
+- `make data`: Pobla el sistema con datos de prueba reales.
+- `make test`: Ejecuta la suite de validación completa.
