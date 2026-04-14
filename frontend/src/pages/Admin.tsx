@@ -123,7 +123,9 @@ const AdminPage = () => {
                 <Accordion type="single" collapsible className="rounded-md border border-border/50 px-3 bg-muted/20">
                   <AccordionItem value="nation-a" className="border-b-0">
                     <AccordionTrigger className="py-3 hover:no-underline">
-                      <span className="text-sm">{nationAName ?? 'Select Nation A'}</span>
+                      <span className={nationAName ? 'text-base font-bold text-foreground' : 'text-sm text-muted-foreground'}>
+                        {nationAName ?? 'Select Nation A'}
+                      </span>
                     </AccordionTrigger>
                     <AccordionContent className="space-y-2">
                       <Input
@@ -157,7 +159,9 @@ const AdminPage = () => {
                 <Accordion type="single" collapsible className="rounded-md border border-border/50 px-3 bg-muted/20">
                   <AccordionItem value="nation-b" className="border-b-0">
                     <AccordionTrigger className="py-3 hover:no-underline">
-                      <span className="text-sm">{nationBName ?? 'Select Nation B'}</span>
+                      <span className={nationBName ? 'text-base font-bold text-foreground' : 'text-sm text-muted-foreground'}>
+                        {nationBName ?? 'Select Nation B'}
+                      </span>
                     </AccordionTrigger>
                     <AccordionContent className="space-y-2">
                       <Input

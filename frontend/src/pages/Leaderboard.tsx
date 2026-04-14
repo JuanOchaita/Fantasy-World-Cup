@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trophy, Medal, TrendingUp, Loader2 } from 'lucide-react';
+import { Trophy, Medal, TrendingUp, Loader2, LocateFixed } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
-import { leaderboardService, type LeaderboardEntry } from '@/services/leaderboard';
+import { leaderboardService, type LeaderboardEntry, type MyRankResponse } from '@/services/leaderboard';
+import { Button } from '@/components/ui/button';
 
 const rankIcon = (rank: number) => {
   if (rank === 1) return <Trophy className="h-5 w-5 text-primary" />;
@@ -15,6 +16,16 @@ const LeaderboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<LeaderboardEntry[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(50);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [myRank, setMyRank] = useState<MyRankResponse | null>(null);
+  const [myRankLoading, setMyRankLoading] = useState(true);
+
+  const myRowInCurrentPage = useMemo(
+    () => (myRank ? items.find(entry => entry.username === myRank.username) ?? null : null),
+    [items, myRank]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -22,9 +33,12 @@ const LeaderboardPage = () => {
     setError(null);
 
     leaderboardService
-      .getGlobal(1, 50)
+      .getGlobal(page, limit)
       .then(res => {
-        if (!cancelled) setItems(res.items);
+        if (!cancelled) {
+          setItems(res.items);
+          setHasNextPage(res.items.length === limit);
+        }
       })
       .catch(err => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load leaderboard');
@@ -36,17 +50,54 @@ const LeaderboardPage = () => {
     return () => {
       cancelled = true;
     };
+  }, [page, limit]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMyRankLoading(true);
+    leaderboardService
+      .getAroundUser()
+      .then(res => {
+        if (!cancelled) setMyRank(res);
+      })
+      .catch(() => {
+        if (!cancelled) setMyRank(null);
+      })
+      .finally(() => {
+        if (!cancelled) setMyRankLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const jumpToMyRankPage = () => {
+    if (!myRank || myRank.rank <= 0) return;
+    const targetPage = Math.max(1, Math.ceil(myRank.rank / limit));
+    setPage(targetPage);
+  };
 
   return (
     <AppLayout>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl text-gold-gradient">Leaderboard</h1>
             <p className="text-muted-foreground mt-1">Global rankings</p>
           </div>
-          <TrendingUp className="h-6 w-6 text-primary" />
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-border/50"
+              onClick={jumpToMyRankPage}
+              disabled={myRankLoading || !myRank || myRank.rank <= 0}
+            >
+              <LocateFixed className="h-4 w-4 mr-1" />
+              Find my rank
+            </Button>
+            <TrendingUp className="h-6 w-6 text-primary" />
+          </div>
         </div>
 
         <div className="glass-card rounded-xl overflow-hidden">
@@ -80,6 +131,8 @@ const LeaderboardPage = () => {
                 transition={{ delay: i * 0.03 }}
                 className={`grid grid-cols-12 gap-2 px-4 py-3 items-center text-sm ${
                   i < 3 ? 'bg-primary/5' : ''
+                } ${
+                  myRank && entry.username === myRank.username ? 'bg-primary/15 ring-1 ring-primary/40' : ''
                 } ${i < items.length - 1 ? 'border-b border-border/10' : ''}`}
               >
                 <div className="col-span-2 sm:col-span-1 flex items-center">{rankIcon(entry.rank)}</div>
@@ -88,6 +141,44 @@ const LeaderboardPage = () => {
               </motion.div>
             ))}
         </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            className="border-border/50"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+          >
+            Previous
+          </Button>
+          <p className="text-sm text-muted-foreground">Page {page}</p>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-border/50"
+            disabled={!hasNextPage || loading}
+            onClick={() => setPage(p => p + 1)}
+          >
+            Next
+          </Button>
+        </div>
+
+        {myRank && (
+          <div className="glass-card rounded-xl p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Your position</p>
+            <p className="text-sm text-foreground mt-1">
+              Rank <span className="font-display text-primary">#{myRank.rank || '—'}</span> ·{' '}
+              <span className="font-medium">{myRank.username}</span> · Points{' '}
+              <span className="font-display text-primary">{myRank.score}</span>
+            </p>
+            {myRowInCurrentPage ? (
+              <p className="text-xs text-emerald-400 mt-1">Highlighted in current page.</p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">Not in current page. Use "Find my rank".</p>
+            )}
+          </div>
+        )}
       </motion.div>
     </AppLayout>
   );
