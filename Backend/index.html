@@ -1,623 +1,160 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Player Search</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: Arial, sans-serif;
     background: #f5f5f5;
-    min-height: 100vh;
-    color: #1a1a1a;
+    color: #222;
   }
 
   header {
-    background: #fff;
-    border-bottom: 1px solid #e0e0e0;
-    padding: 12px 24px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-
-  .logo {
-    font-weight: 700;
-    font-size: 18px;
-    color: #1a73e8;
-    white-space: nowrap;
-    letter-spacing: -0.5px;
-  }
-
-  .search-wrapper {
-    position: relative;
-    flex: 1;
-    max-width: 680px;
+    background: white;
+    padding: 15px 20px;
+    border-bottom: 1px solid #ddd;
   }
 
   .search-box {
     display: flex;
-    align-items: center;
-    background: #fff;
-    border: 1.5px solid #dfe1e5;
-    border-radius: 24px;
-    padding: 0 16px;
     gap: 10px;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-
-  .search-box:focus-within {
-    border-color: #1a73e8;
-    box-shadow: 0 0 0 3px rgba(26,115,232,0.12);
-  }
-
-  .search-box svg {
-    flex-shrink: 0;
-    color: #9aa0a6;
+    max-width: 700px;
+    margin: auto;
   }
 
   #search-input {
     flex: 1;
-    border: none;
-    outline: none;
-    font-size: 15px;
-    padding: 10px 0;
-    background: transparent;
-    color: #1a1a1a;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
   }
 
   #clear-btn {
-    display: none;
-    background: none;
+    padding: 10px 14px;
     border: none;
+    background: #e74c3c;
+    color: white;
+    border-radius: 8px;
     cursor: pointer;
-    color: #9aa0a6;
-    padding: 4px;
-    line-height: 0;
-    border-radius: 50%;
+    display: none;
   }
-
-  #clear-btn:hover { color: #555; }
 
   .suggestions-dropdown {
+    max-width: 700px;
+    margin: 5px auto 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
     display: none;
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    background: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-    z-index: 200;
-    overflow: hidden;
-    max-height: 380px;
-    overflow-y: auto;
   }
 
-  .suggestions-dropdown.visible { display: block; }
+  .suggestions-dropdown.visible {
+    display: block;
+  }
 
   .suggestion-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
+    padding: 10px;
     cursor: pointer;
-    font-size: 14px;
-    color: #333;
-    border-bottom: 1px solid #f5f5f5;
-    transition: background 0.08s;
+    border-bottom: 1px solid #eee;
   }
 
-  .suggestion-item:last-child { border-bottom: none; }
-  .suggestion-item:hover, .suggestion-item.focused { background: #f1f3f4; }
-
-  .suggestion-item svg { color: #9aa0a6; flex-shrink: 0; }
-
-  .suggestion-name em {
-    font-style: normal;
-    font-weight: 600;
-    color: #1a1a1a;
+  .suggestion-item:hover {
+    background: #f2f2f2;
   }
 
   .main-layout {
     display: flex;
-    height: calc(100vh - 57px);
+    min-height: calc(100vh - 70px);
   }
 
   .results-panel {
     flex: 1;
-    overflow-y: auto;
-    padding: 20px 24px;
-    min-width: 0;
+    padding: 20px;
   }
-
-  .results-panel::-webkit-scrollbar { width: 6px; }
-  .results-panel::-webkit-scrollbar-track { background: transparent; }
-  .results-panel::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
-
-  .player-panel {
-    width: 360px;
-    flex-shrink: 0;
-    background: #fff;
-    border-left: 1px solid #e0e0e0;
-    overflow-y: auto;
-    transition: transform 0.25s ease;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .player-panel.hidden { display: none; }
-
-  .player-panel::-webkit-scrollbar { width: 6px; }
-  .player-panel::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
-
-  .filters-bar {
-    background: #fff;
-    border-bottom: 1px solid #e8e8e8;
-    padding: 10px 24px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  .filter-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .filter-group label {
-    font-size: 12px;
-    color: #666;
-    white-space: nowrap;
-  }
-
-  .filter-group select, .filter-group input[type="number"] {
-    font-size: 12px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    padding: 4px 8px;
-    background: #fff;
-    color: #333;
-    outline: none;
-    height: 28px;
-  }
-
-  .filter-group input[type="number"] { width: 70px; }
-
-  .filter-group select:focus, .filter-group input:focus {
-    border-color: #1a73e8;
-  }
-
-  .filter-separator {
-    width: 1px;
-    height: 20px;
-    background: #e0e0e0;
-  }
-
-  .btn-apply {
-    font-size: 12px;
-    padding: 5px 14px;
-    background: #1a73e8;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    height: 28px;
-    white-space: nowrap;
-    transition: background 0.1s;
-  }
-
-  .btn-apply:hover { background: #1558b0; }
-
-  .btn-reset {
-    font-size: 12px;
-    padding: 5px 12px;
-    background: none;
-    color: #666;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    cursor: pointer;
-    height: 28px;
-    transition: border-color 0.1s;
-  }
-
-  .btn-reset:hover { border-color: #999; color: #333; }
-
-  .results-meta {
-    font-size: 13px;
-    color: #70757a;
-    margin-bottom: 14px;
-  }
-
-  .results-meta span { color: #1a1a1a; font-weight: 500; }
 
   .results-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px;
+    gap: 15px;
   }
 
   .player-card {
-    background: #fff;
-    border: 1px solid #e8e8e8;
+    background: white;
+    border: 1px solid #ddd;
     border-radius: 10px;
-    padding: 14px 16px;
+    padding: 15px;
     cursor: pointer;
-    transition: border-color 0.1s, box-shadow 0.1s, transform 0.1s;
-    position: relative;
   }
 
   .player-card:hover {
-    border-color: #1a73e8;
-    box-shadow: 0 2px 8px rgba(26,115,232,0.1);
-    transform: translateY(-1px);
+    border-color: #3498db;
   }
 
-  .player-card.active {
-    border-color: #1a73e8;
-    background: #f0f6ff;
-  }
-
-  .card-name {
-    font-size: 14px;
-    font-weight: 600;
-    color: #1a1a1a;
-    margin-bottom: 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .card-meta {
-    font-size: 12px;
-    color: #70757a;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-
-  .badge {
-    font-size: 11px;
-    padding: 2px 7px;
-    border-radius: 4px;
-    font-weight: 500;
-    background: #e8f0fe;
-    color: #1a73e8;
-  }
-
-  .badge.overall {
-    background: #e6f4ea;
-    color: #188038;
-  }
-
-  .badge.position {
-    background: #fce8e6;
-    color: #c5221f;
-  }
-
-  .pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin-top: 24px;
-    padding-bottom: 24px;
-  }
-
-  .page-btn {
-    padding: 6px 14px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    background: #fff;
-    font-size: 13px;
-    cursor: pointer;
-    color: #333;
-    transition: background 0.1s, border-color 0.1s;
-  }
-
-  .page-btn:hover:not(:disabled) { background: #f1f3f4; border-color: #bbb; }
-  .page-btn:disabled { opacity: 0.4; cursor: default; }
-  .page-btn.current { background: #1a73e8; color: #fff; border-color: #1a73e8; }
-
-  .page-info {
-    font-size: 13px;
-    color: #70757a;
-  }
-
-  .empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: #70757a;
-  }
-
-  .empty-state svg { margin-bottom: 16px; opacity: 0.4; }
-  .empty-state p { font-size: 15px; }
-  .empty-state small { font-size: 13px; margin-top: 6px; display: block; }
-
-  .loading-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 60px 20px;
-    gap: 10px;
-    color: #70757a;
-    font-size: 14px;
-  }
-
-  .spinner {
-    width: 18px;
-    height: 18px;
-    border: 2px solid #ddd;
-    border-top-color: #1a73e8;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .player-panel-header {
-    padding: 16px 20px 12px;
-    border-bottom: 1px solid #f0f0f0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .player-panel-header h3 {
-    font-size: 14px;
-    font-weight: 600;
-    color: #555;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .close-panel-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #9aa0a6;
-    padding: 4px;
-    border-radius: 4px;
-    line-height: 0;
-  }
-
-  .close-panel-btn:hover { color: #555; background: #f1f3f4; }
-
-  .panel-body {
+  .player-panel {
+    width: 350px;
+    background: white;
+    border-left: 1px solid #ddd;
     padding: 20px;
-    flex: 1;
   }
 
-  .player-avatar {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #1a73e8, #0d47a1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    font-weight: 700;
-    color: #fff;
-    margin-bottom: 12px;
+  .player-panel.hidden {
+    display: none;
   }
 
-  .panel-name {
-    font-size: 18px;
-    font-weight: 700;
-    color: #1a1a1a;
-    margin-bottom: 4px;
+  .loading,
+  .empty {
+    text-align: center;
+    padding: 40px;
+    color: #666;
   }
 
-  .panel-short-name {
-    font-size: 13px;
-    color: #70757a;
-    margin-bottom: 16px;
-  }
-
-  .panel-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 20px;
-  }
-
-  .panel-badge {
-    font-size: 12px;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-weight: 500;
-  }
-
-  .panel-badge.overall { background: #e6f4ea; color: #188038; }
-  .panel-badge.position { background: #fce8e6; color: #c5221f; }
-  .panel-badge.club { background: #e8f0fe; color: #1a73e8; }
-  .panel-badge.nation { background: #fef3e2; color: #b46309; }
-
-  .info-section {
-    margin-bottom: 20px;
-  }
-
-  .info-section-title {
-    font-size: 11px;
-    font-weight: 600;
-    color: #9aa0a6;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-bottom: 10px;
-  }
-
-  .info-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 7px 0;
-    border-bottom: 1px solid #f5f5f5;
-    font-size: 13px;
-  }
-
-  .info-row:last-child { border-bottom: none; }
-
-  .info-label { color: #70757a; }
-  .info-value { font-weight: 500; color: #1a1a1a; text-align: right; max-width: 55%; }
-
-  .stat-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
-  .stat-box {
-    background: #f8f9fa;
+  .error {
+    background: #ffe6e6;
+    color: #c00;
+    padding: 10px;
     border-radius: 8px;
-    padding: 10px 12px;
   }
 
-  .stat-box-label {
-    font-size: 11px;
-    color: #9aa0a6;
-    margin-bottom: 2px;
-  }
-
-  .stat-box-value {
-    font-size: 18px;
-    font-weight: 700;
-    color: #1a1a1a;
-  }
-
-  .panel-loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 12px;
-    padding: 60px 20px;
-    color: #70757a;
-    font-size: 13px;
-  }
-
-  .error-notice {
-    background: #fce8e6;
-    color: #c5221f;
-    padding: 10px 14px;
-    border-radius: 8px;
-    font-size: 13px;
-    margin-bottom: 16px;
-  }
-
-  @media (max-width: 768px) {
-    .player-panel {
-      position: fixed;
-      right: 0; top: 0; bottom: 0;
-      width: 100%;
-      z-index: 300;
-    }
-
-    .filters-bar { overflow-x: auto; flex-wrap: nowrap; }
-    .results-grid { grid-template-columns: 1fr; }
+  button {
+    cursor: pointer;
   }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">PlayerSearch</div>
-  <div class="search-wrapper">
-    <div class="search-box">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-      </svg>
-      <input type="text" id="search-input" placeholder="Search players..." autocomplete="off" spellcheck="false">
-      <button id="clear-btn" type="button" aria-label="Clear">
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path d="M18 6 6 18M6 6l12 12"/>
-        </svg>
-      </button>
-    </div>
-    <div id="suggestions" class="suggestions-dropdown"></div>
+  <div class="search-box">
+    <input
+      type="text"
+      id="search-input"
+      placeholder="Buscar jugadores..."
+      autocomplete="off"
+    >
+    <button id="clear-btn">Limpiar</button>
   </div>
-</header>
 
-<div class="filters-bar" id="filters-bar" style="display:none;">
-  <div class="filter-group">
-    <label>Position</label>
-    <select id="f-position">
-      <option value="">All</option>
-      <option value="GK">GK</option>
-      <option value="CB">CB</option>
-      <option value="LB">LB</option>
-      <option value="RB">RB</option>
-      <option value="LWB">LWB</option>
-      <option value="RWB">RWB</option>
-      <option value="CDM">CDM</option>
-      <option value="CM">CM</option>
-      <option value="CAM">CAM</option>
-      <option value="LM">LM</option>
-      <option value="RM">RM</option>
-      <option value="LW">LW</option>
-      <option value="RW">RW</option>
-      <option value="CF">CF</option>
-      <option value="ST">ST</option>
-    </select>
-  </div>
-  <div class="filter-separator"></div>
-  <div class="filter-group">
-    <label>Overall</label>
-    <input type="number" id="f-min-overall" placeholder="Min" min="1" max="99">
-    <span style="font-size:12px;color:#999;">–</span>
-    <input type="number" id="f-max-overall" placeholder="Max" min="1" max="99">
-  </div>
-  <div class="filter-separator"></div>
-  <div class="filter-group">
-    <label>Value EUR</label>
-    <input type="number" id="f-min-value" placeholder="Min" min="0">
-    <span style="font-size:12px;color:#999;">–</span>
-    <input type="number" id="f-max-value" placeholder="Max" min="0">
-  </div>
-  <div class="filter-separator"></div>
-  <div class="filter-group">
-    <label>Club</label>
-    <input type="text" id="f-club" placeholder="None" style="width:120px;font-size:12px;border:1px solid #ddd;border-radius:6px;padding:4px 8px;height:28px;outline:none;">
-  </div>
-  <div class="filter-separator"></div>
-  <div class="filter-group">
-    <label>Nationality</label>
-    <input type="text" id="f-nation" placeholder="None" style="width:110px;font-size:12px;border:1px solid #ddd;border-radius:6px;padding:4px 8px;height:28px;outline:none;">
-  </div>
-  <div class="filter-separator"></div>
-  <button class="btn-apply" id="btn-apply">Apply</button>
-  <button class="btn-reset" id="btn-reset">Reset</button>
-</div>
+  <div id="suggestions" class="suggestions-dropdown"></div>
+</header>
 
 <div class="main-layout">
   <div class="results-panel" id="results-panel">
-    <div class="empty-state" id="empty-state">
-      <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-      </svg>
-      <p>Search for players</p>
-      <small>Type a name and press Enter to search</small>
+    <div class="empty">
+      Escribe un nombre y presiona Enter
     </div>
   </div>
+
   <div class="player-panel hidden" id="player-panel">
-    <div class="player-panel-header">
-      <h3>Player Info</h3>
-      <button class="close-panel-btn" id="close-panel-btn">
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path d="M18 6 6 18M6 6l12 12"/>
-        </svg>
-      </button>
-    </div>
-    <div id="panel-content" class="panel-body"></div>
+    <button id="close-panel-btn">Cerrar</button>
+    <div id="panel-content"></div>
   </div>
 </div>
 
@@ -632,292 +169,213 @@ const suggestionsEl = document.getElementById('suggestions');
 const resultsPanel = document.getElementById('results-panel');
 const playerPanel = document.getElementById('player-panel');
 const panelContent = document.getElementById('panel-content');
-const emptyState = document.getElementById('empty-state');
-const filtersBar = document.getElementById('filters-bar');
-const closePanel = document.getElementById('close-panel-btn');
+const closePanelBtn = document.getElementById('close-panel-btn');
 
 let debounceTimer = null;
-let currentQuery = '';
-let currentPage = 1;
-let totalPages = 1;
-let activeCardId = null;
-let focusedSuggestionIndex = -1;
-let lastSuggestions = [];
 
-function getFilters() {
-  return {
-    positions: document.getElementById('f-position').value || '',
-    min_overall: document.getElementById('f-min-overall').value || '',
-    max_overall: document.getElementById('f-max-overall').value || '',
-    min_value_eur: document.getElementById('f-min-value').value || '',
-    max_value_eur: document.getElementById('f-max-value').value || '',
-    club_name: document.getElementById('f-club').value || '',
-    nationality: document.getElementById('f-nation').value || '',
-  };
-}
-
-function buildESUrl(q, page, filters) {
-  const params = new URLSearchParams({ q, page, size: 50 });
-  if (filters.positions) params.set('positions', filters.positions);
-  if (filters.min_overall) params.set('min_overall', filters.min_overall);
-  if (filters.max_overall) params.set('max_overall', filters.max_overall);
-  if (filters.min_value_eur) params.set('min_value_eur', filters.min_value_eur);
-  if (filters.max_value_eur) params.set('max_value_eur', filters.max_value_eur);
-  if (filters.club_name) params.set('club_name', filters.club_name);
-  if (filters.nationality) params.set('nationality', filters.nationality);
-  return `${ES_URL}/search/players?${params.toString()}`;
-}
-
-function highlight(name, query) {
-  if (!query) return name;
-  const esc = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return name.replace(new RegExp(`(${esc})`, 'gi'), '<em>$1</em>');
+function escapeHtml(text = '') {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function hideSuggestions() {
   suggestionsEl.innerHTML = '';
   suggestionsEl.classList.remove('visible');
-  focusedSuggestionIndex = -1;
-}
-
-function showSuggestions(players, query) {
-  lastSuggestions = players;
-  if (!players || players.length === 0) { hideSuggestions(); return; }
-  suggestionsEl.innerHTML = players.slice(0, 10).map((p, i) => `
-    <div class="suggestion-item" data-index="${i}" data-id="${p.id}" data-name="${escAttr(p.name)}">
-      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-      </svg>
-      <span class="suggestion-name">${highlight(p.name, query)}</span>
-    </div>
-  `).join('');
-  suggestionsEl.classList.add('visible');
-  suggestionsEl.querySelectorAll('.suggestion-item').forEach(el => {
-    el.addEventListener('mousedown', e => {
-      e.preventDefault();
-      const name = el.dataset.name;
-      const id = el.dataset.id;
-      searchInput.value = name;
-      hideSuggestions();
-      if (id) {
-        loadPlayerInfo(id, name);
-      }
-    });
-  });
-}
-
-function escAttr(s) {
-  return s.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 async function fetchSuggestions(query) {
   try {
-    const res = await fetch(`${REDIS_URL}/redis?key=${encodeURIComponent(query)}`);
-    if (!res.ok) { hideSuggestions(); return; }
+    const res = await fetch(
+      `${REDIS_URL}/redis?key=${encodeURIComponent(query)}`
+    );
+
+    if (!res.ok) {
+      hideSuggestions();
+      return;
+    }
+
     const players = await res.json();
-    showSuggestions(Array.isArray(players) ? players : [], query);
-  } catch (e) {
+
+    if (!Array.isArray(players) || players.length === 0) {
+      hideSuggestions();
+      return;
+    }
+
+    suggestionsEl.innerHTML = players.slice(0, 10).map(player => `
+      <div
+        class="suggestion-item"
+        data-id="${player.id || ''}"
+        data-name="${escapeHtml(player.name || '')}"
+      >
+        ${escapeHtml(player.name || '')}
+      </div>
+    `).join('');
+
+    suggestionsEl.classList.add('visible');
+
+    suggestionsEl.querySelectorAll('.suggestion-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const id = item.dataset.id;
+        const name = item.dataset.name;
+
+        searchInput.value = name;
+        hideSuggestions();
+
+        loadPlayerInfo(id);
+      });
+    });
+
+  } catch (error) {
+    console.error(error);
     hideSuggestions();
   }
 }
 
-async function runSearch(query, page, filters) {
-  currentQuery = query;
-  currentPage = page;
-  filtersBar.style.display = 'flex';
-  hideSuggestions();
-
-  resultsPanel.innerHTML = `<div class="loading-state"><div class="spinner"></div> Searching...</div>`;
+async function runSearch(query) {
+  resultsPanel.innerHTML = `
+    <div class="loading">Buscando...</div>
+  `;
 
   try {
-    const url = buildESUrl(query, page, filters);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const res = await fetch(
+      `${ES_URL}/search/players?q=${encodeURIComponent(query)}&page=1&size=50`
+    );
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
     const data = await res.json();
-    renderResults(data, query);
-  } catch (e) {
-    resultsPanel.innerHTML = `<div class="empty-state"><p>Could not connect to search service</p><small>${e.message}</small></div>`;
+
+    renderResults(data.results || []);
+
+  } catch (error) {
+    resultsPanel.innerHTML = `
+      <div class="error">
+        Error cargando resultados: ${error.message}
+      </div>
+    `;
   }
 }
 
-function formatValue(v) {
-  if (!v && v !== 0) return '—';
-  if (v >= 1e6) return `€${(v / 1e6).toFixed(1)}M`;
-  if (v >= 1e3) return `€${(v / 1e3).toFixed(0)}K`;
-  return `€${v}`;
-}
-
-function renderResults(data, query) {
-  const results = data.results || [];
-  const pagination = data.pagination || {};
-  totalPages = pagination.total_pages || 1;
-  const total = pagination.total_items || 0;
-  const took = data.took_ms ?? '—';
-
-  if (results.length === 0) {
-    resultsPanel.innerHTML = `<div class="empty-state">
-      <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-      </svg>
-      <p>No results for &ldquo;${escAttr(query)}&rdquo;</p>
-      <small>Try adjusting filters or check for typos</small>
-    </div>`;
+function renderResults(players) {
+  if (!players.length) {
+    resultsPanel.innerHTML = `
+      <div class="empty">No se encontraron resultados</div>
+    `;
     return;
   }
 
-  const meta = `<div class="results-meta">About <span>${total.toLocaleString()}</span> results (${took}ms)</div>`;
-  const cards = results.map(p => {
-    const positions = Array.isArray(p.player_positions) ? p.player_positions.join(', ') : (p.player_positions || '—');
-    const cardId = p.sofifa_id || p.id || '';
-    return `<div class="player-card${activeCardId == cardId ? ' active' : ''}" data-id="${cardId}" data-name="${escAttr(p.long_name || p.short_name || '')}">
-      <div class="card-name">${p.long_name || p.short_name || '—'}</div>
-      <div class="card-meta">
-        <span class="badge overall">${p.overall ?? '—'}</span>
-        <span class="badge position">${positions}</span>
-        <span>${p.club_name || '—'}</span>
-      </div>
-      <div style="margin-top:8px;font-size:12px;color:#9aa0a6;display:flex;gap:10px;">
-        <span>${p.nationality_name || '—'}</span>
-        <span>${formatValue(p.value_eur)}</span>
-        ${p.age ? `<span>${p.age} yrs</span>` : ''}
-      </div>
-    </div>`;
-  }).join('');
+  resultsPanel.innerHTML = `
+    <div class="results-grid">
+      ${players.map(player => {
+        const id = player.player_id || '';
+        const name = player.long_name || player.short_name || 'Sin nombre';
+        const overall = player.overall ?? '-';
+        const positions = player.player_positions || '-';
+        const club = player.club_name || '-';
 
-  const pages = buildPagination(currentPage, totalPages);
-
-  resultsPanel.innerHTML = meta + `<div class="results-grid">${cards}</div>` + pages;
+        return `
+          <div class="player-card" data-id="${id}">
+            <h3>${escapeHtml(name)}</h3>
+            <p><strong>Overall:</strong> ${overall}</p>
+            <p><strong>Posiciones:</strong> ${escapeHtml(positions)}</p>
+            <p><strong>Club:</strong> ${escapeHtml(club)}</p>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
 
   resultsPanel.querySelectorAll('.player-card').forEach(card => {
     card.addEventListener('click', () => {
       const id = card.dataset.id;
-      const name = card.dataset.name;
-      resultsPanel.querySelectorAll('.player-card').forEach(c => c.classList.remove('active'));
-      card.classList.add('active');
-      activeCardId = id;
-      loadPlayerInfo(id, name);
-    });
-  });
 
-  resultsPanel.querySelectorAll('.page-btn[data-page]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const p = parseInt(btn.dataset.page);
-      runSearch(currentQuery, p, getFilters());
-      resultsPanel.scrollTo({ top: 0, behavior: 'smooth' });
+      if (!id) {
+        alert('No se encontró ID del jugador');
+        return;
+      }
+
+      loadPlayerInfo(id);
     });
   });
 }
 
-function buildPagination(current, total) {
-  if (total <= 1) return '';
-  const prev = `<button class="page-btn" data-page="${current - 1}" ${current <= 1 ? 'disabled' : ''}>&#8592; Prev</button>`;
-  const next = `<button class="page-btn" data-page="${current + 1}" ${current >= total ? 'disabled' : ''}>Next &#8594;</button>`;
-  const info = `<span class="page-info">Page ${current} of ${total}</span>`;
-  return `<div class="pagination">${prev}${info}${next}</div>`;
-}
+async function loadPlayerInfo(playerId) {
+  if (!playerId) {
+    return;
+  }
 
-async function loadPlayerInfo(id, name) {
   playerPanel.classList.remove('hidden');
-  panelContent.innerHTML = `<div class="panel-loading"><div class="spinner"></div><span>Loading player data...</span></div>`;
+
+  panelContent.innerHTML = `
+    <div class="loading">Cargando jugador...</div>
+  `;
 
   try {
-    const res = await fetch(`${INFO_URL}/player?name=${encodeURIComponent(name)}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    renderPlayerPanel(data);
-  } catch (e) {
-    panelContent.innerHTML = `<div class="error-notice">Could not load player data: ${e.message}</div>`;
+    const res = await fetch(
+      `${INFO_URL}/player?name=${encodeURIComponent(playerId)}`
+    );
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const player = await res.json();
+
+    renderPlayer(player);
+
+  } catch (error) {
+    panelContent.innerHTML = `
+      <div class="error">
+        Error cargando jugador: ${error.message}
+      </div>
+    `;
   }
 }
 
-function renderPlayerPanel(p) {
-  const name = p.long_name || p.short_name || '—';
-  const initials = name.split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
-  const positions = Array.isArray(p.player_positions) ? p.player_positions.join(', ') : (p.player_positions || '—');
-
-  const keyStats = [
-    ['pace', 'PAC'], ['shooting', 'SHO'], ['passing', 'PAS'],
-    ['dribbling', 'DRI'], ['defending', 'DEF'], ['physic', 'PHY']
-  ];
-
-  const statBoxes = keyStats.filter(([k]) => p[k] !== undefined && p[k] !== null).map(([k, label]) => `
-    <div class="stat-box">
-      <div class="stat-box-label">${label}</div>
-      <div class="stat-box-value">${p[k]}</div>
-    </div>
-  `).join('');
-
-  const infoRows = [
-    ['Age', p.age],
-    ['Height', p.height_cm ? `${p.height_cm} cm` : null],
-    ['Weight', p.weight_kg ? `${p.weight_kg} kg` : null],
-    ['Preferred foot', p.preferred_foot],
-    ['Weak foot', p.weak_foot ? `${p.weak_foot} ★` : null],
-    ['Skill moves', p.skill_moves ? `${p.skill_moves} ★` : null],
-    ['Work rate', p.work_rate],
-    ['Body type', p.body_type],
-    ['Jersey #', p.club_jersey_number],
-    ['Wage', p.wage_eur ? `€${Number(p.wage_eur).toLocaleString()}` : null],
-    ['Value', formatValue(p.value_eur)],
-    ['Contract until', p.club_contract_valid_until],
-  ].filter(([, v]) => v !== null && v !== undefined && v !== '');
+function renderPlayer(player) {
+  const name = player.long_name || player.short_name || 'Sin nombre';
 
   panelContent.innerHTML = `
-    <div class="player-avatar">${initials}</div>
-    <div class="panel-name">${name}</div>
-    <div class="panel-short-name">${p.short_name !== name ? p.short_name || '' : ''}</div>
-    <div class="panel-badges">
-      ${p.overall !== undefined ? `<span class="panel-badge overall">OVR ${p.overall}</span>` : ''}
-      ${positions ? `<span class="panel-badge position">${positions}</span>` : ''}
-      ${p.club_name ? `<span class="panel-badge club">${p.club_name}</span>` : ''}
-      ${p.nationality_name ? `<span class="panel-badge nation">${p.nationality_name}</span>` : ''}
-    </div>
-    ${statBoxes ? `<div class="info-section"><div class="info-section-title">Key Stats</div><div class="stat-grid">${statBoxes}</div></div>` : ''}
-    ${infoRows.length ? `<div class="info-section">
-      <div class="info-section-title">Player Info</div>
-      ${infoRows.map(([label, value]) => `
-        <div class="info-row">
-          <span class="info-label">${label}</span>
-          <span class="info-value">${value}</span>
-        </div>
-      `).join('')}
-    </div>` : ''}
+    <h2>${escapeHtml(name)}</h2>
+    <p><strong>Overall:</strong> ${player.overall || '-'}</p>
+    <p><strong>Posición:</strong> ${escapeHtml(player.player_positions || '-')}</p>
+    <p><strong>Club:</strong> ${escapeHtml(player.club_name || '-')}</p>
+    <p><strong>Nacionalidad:</strong> ${escapeHtml(player.nationality_name || '-')}</p>
+    <p><strong>Edad:</strong> ${player.age || '-'}</p>
   `;
 }
 
 searchInput.addEventListener('input', () => {
-  const val = searchInput.value;
-  clearBtn.style.display = val.length > 0 ? 'block' : 'none';
+  const value = searchInput.value.trim();
+
+  clearBtn.style.display = value ? 'block' : 'none';
+
   clearTimeout(debounceTimer);
-  if (val.trim().length < 2) { hideSuggestions(); return; }
-  debounceTimer = setTimeout(() => fetchSuggestions(val.trim()), 150);
+
+  if (value.length < 2) {
+    hideSuggestions();
+    return;
+  }
+
+  debounceTimer = setTimeout(() => {
+    fetchSuggestions(value);
+  }, 200);
 });
 
-searchInput.addEventListener('keydown', e => {
-  const items = suggestionsEl.querySelectorAll('.suggestion-item');
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const query = searchInput.value.trim();
 
-  if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    focusedSuggestionIndex = Math.min(focusedSuggestionIndex + 1, items.length - 1);
-    items.forEach((el, i) => el.classList.toggle('focused', i === focusedSuggestionIndex));
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    focusedSuggestionIndex = Math.max(focusedSuggestionIndex - 1, -1);
-    items.forEach((el, i) => el.classList.toggle('focused', i === focusedSuggestionIndex));
-  } else if (e.key === 'Enter') {
-    if (focusedSuggestionIndex >= 0 && items[focusedSuggestionIndex]) {
-      const el = items[focusedSuggestionIndex];
-      const name = el.dataset.name;
-      const id = el.dataset.id;
-      searchInput.value = name;
+    if (query) {
       hideSuggestions();
-      if (id) loadPlayerInfo(id, name);
-    } else {
-      const q = searchInput.value.trim();
-      if (q) runSearch(q, 1, getFilters());
+      runSearch(query);
     }
-  } else if (e.key === 'Escape') {
-    hideSuggestions();
   }
 });
 
@@ -925,40 +383,26 @@ clearBtn.addEventListener('click', () => {
   searchInput.value = '';
   clearBtn.style.display = 'none';
   hideSuggestions();
-  filtersBar.style.display = 'none';
-  resultsPanel.innerHTML = '';
-  resultsPanel.appendChild(Object.assign(document.createElement('div'), {
-    className: 'empty-state',
-    innerHTML: `<svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><p>Search for players</p><small>Type a name and press Enter to search</small>`
-  }));
+
+  resultsPanel.innerHTML = `
+    <div class="empty">
+      Escribe un nombre y presiona Enter
+    </div>
+  `;
+
   playerPanel.classList.add('hidden');
-  searchInput.focus();
 });
 
-document.getElementById('btn-apply').addEventListener('click', () => {
-  if (currentQuery) runSearch(currentQuery, 1, getFilters());
-});
-
-document.getElementById('btn-reset').addEventListener('click', () => {
-  document.getElementById('f-position').value = '';
-  document.getElementById('f-min-overall').value = '';
-  document.getElementById('f-max-overall').value = '';
-  document.getElementById('f-min-value').value = '';
-  document.getElementById('f-max-value').value = '';
-  document.getElementById('f-club').value = '';
-  document.getElementById('f-nation').value = '';
-  if (currentQuery) runSearch(currentQuery, 1, getFilters());
-});
-
-closePanel.addEventListener('click', () => {
+closePanelBtn.addEventListener('click', () => {
   playerPanel.classList.add('hidden');
-  activeCardId = null;
-  resultsPanel.querySelectorAll('.player-card').forEach(c => c.classList.remove('active'));
 });
 
-document.addEventListener('click', e => {
-  if (!e.target.closest('.search-wrapper')) hideSuggestions();
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('header')) {
+    hideSuggestions();
+  }
 });
 </script>
+
 </body>
 </html>
