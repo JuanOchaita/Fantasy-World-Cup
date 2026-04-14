@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
@@ -16,6 +17,12 @@ import (
 
 var ctx = context.Background()
 var rdb *redis.Client
+
+// playerEntry es el formato almacenado en Redis para cada jugador.
+type playerEntry struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
 
 // normalize quita acentos/diacríticos y convierte a minúsculas,
 // igual que en redis-main.go para que las keys coincidan.
@@ -100,5 +107,12 @@ func getRedisValue(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"key": normalizedKey, "value": val})
+	// Deserializar el array de playerEntry y devolverlo directamente
+	var players []playerEntry
+	if err := json.Unmarshal([]byte(val), &players); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error deserializando valor de Redis"})
+		return
+	}
+
+	c.JSON(http.StatusOK, players)
 }

@@ -38,8 +38,15 @@ var (
 	redis_db       = 0
 )
 
-// nameEntry guarda el nombre original y las señales de relevancia para ese prefijo concreto.
+// playerEntry es el formato final almacenado en Redis para cada jugador.
+type playerEntry struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+// nameEntry guarda el nombre original, el id y las señales de relevancia para ese prefijo concreto.
 type nameEntry struct {
+	PlayerID  int
 	Name      string
 	WordPos   int // posición de la palabra que generó el match (0 = primer nombre)
 	WordLen   int // longitud de la palabra completa
@@ -49,13 +56,14 @@ type nameEntry struct {
 }
 
 // score calcula la relevancia combinada, imitando las señales básicas de Google:
-//   exactitud  (0.50): qué fracción de la palabra cubre el prefijo
-//   posición   (0.35): primer nombre vale más que segundo, etc.
-//   brevedad   (0.15): nombres más cortos suben ante igual relevancia
+//
+//	exactitud  (0.50): qué fracción de la palabra cubre el prefijo
+//	posición   (0.35): primer nombre vale más que segundo, etc.
+//	brevedad   (0.15): nombres más cortos suben ante igual relevancia
 func (e nameEntry) score() float64 {
-	exactitud := float64(e.PrefixLen) / float64(e.WordLen)          // [0..1]
-	posicion  := 1.0 / float64(e.WordPos+1)                          // 1, 0.5, 0.33…
-	brevedad  := 1.0 / float64(e.NameLen)                            // más pequeño = más relevante
+	exactitud := float64(e.PrefixLen) / float64(e.WordLen) // [0..1]
+	posicion := 1.0 / float64(e.WordPos+1)                 // 1, 0.5, 0.33…
+	brevedad := 1.0 / float64(e.NameLen)                   // más pequeño = más relevante
 	return exactitud*0.50 + posicion*0.35 + brevedad*0.15
 }
 
@@ -115,7 +123,7 @@ func main() {
 	log.Println("✓ Conectado a Redis")
 
 	// ── Consulta PostgreSQL ──────────────────────────────────────────────────
-	rows, err := db.Query("SELECT long_name, overall FROM players")
+	rows, err := db.Query("SELECT player_id, long_name, overall FROM players")
 	if err != nil {
 		log.Fatalf("Error ejecutando query: %v", err)
 	}
@@ -127,9 +135,10 @@ func main() {
 	processed, skipped := 0, 0
 
 	for rows.Next() {
-		var originalName string
-		var overall      int
-		if err := rows.Scan(&originalName, &overall); err != nil {
+		var playerID      int
+		var originalName  string
+		var overall       int
+		if err := rows.Scan(&playerID, &originalName, &overall); err != nil {
 			skipped++
 			continue
 		}
@@ -150,6 +159,7 @@ func main() {
 			for prefixLen := 1; prefixLen <= wordLen; prefixLen++ {
 				prefix := word[:prefixLen]
 				prefixMap[prefix] = append(prefixMap[prefix], nameEntry{
+					PlayerID:  playerID,
 					Name:      originalName,
 					WordPos:   wordPos,
 					WordLen:   wordLen,
@@ -175,7 +185,6 @@ func main() {
 
 	for prefix, entries := range prefixMap {
 		// 1. Ordenar por score descendente; desempate por overall descendente.
-		//    sort.SliceStable preserva el orden de llegada ante empate total.
 		sort.SliceStable(entries, func(i, j int) bool {
 			si, sj := entries[i].score(), entries[j].score()
 			if si != sj {
@@ -186,12 +195,15 @@ func main() {
 
 		// 2. Deduplicar: si un jugador aparece por varias palabras,
 		//    quedarse solo con su entrada de mayor score (la primera tras el sort).
-		seen := make(map[string]struct{})
-		orderedNames := make([]string, 0, len(entries))
+		seen := make(map[int]struct{})
+		orderedPlayers := make([]playerEntry, 0, len(entries))
 		for _, e := range entries {
-			if _, ok := seen[e.Name]; !ok {
-				seen[e.Name] = struct{}{}
-				orderedNames = append(orderedNames, e.Name)
+			if _, ok := seen[e.PlayerID]; !ok {
+				seen[e.PlayerID] = struct{}{}
+				orderedPlayers = append(orderedPlayers, playerEntry{
+					ID:   e.PlayerID,
+					Name: e.Name,
+				})
 			}
 		}
 
@@ -200,7 +212,7 @@ func main() {
 
 		if err == redis.Nil {
 			// Key nueva
-			data, err := json.Marshal(orderedNames)
+			data, err := json.Marshal(orderedPlayers)
 			if err != nil {
 				errors++
 				continue
@@ -217,24 +229,24 @@ func main() {
 			errors++
 
 		} else {
-			// Key existente: agregar al final los nombres nuevos sin duplicar
-			var currentNames []string
-			if err := json.Unmarshal([]byte(existing), &currentNames); err != nil {
-				currentNames = []string{}
+			// Key existente: agregar al final los jugadores nuevos sin duplicar
+			var currentPlayers []playerEntry
+			if err := json.Unmarshal([]byte(existing), &currentPlayers); err != nil {
+				currentPlayers = []playerEntry{}
 			}
 
-			existingSeen := make(map[string]struct{}, len(currentNames))
-			for _, n := range currentNames {
-				existingSeen[n] = struct{}{}
+			existingSeen := make(map[int]struct{}, len(currentPlayers))
+			for _, p := range currentPlayers {
+				existingSeen[p.ID] = struct{}{}
 			}
-			for _, n := range orderedNames {
-				if _, ok := existingSeen[n]; !ok {
-					currentNames = append(currentNames, n)
-					existingSeen[n] = struct{}{}
+			for _, p := range orderedPlayers {
+				if _, ok := existingSeen[p.ID]; !ok {
+					currentPlayers = append(currentPlayers, p)
+					existingSeen[p.ID] = struct{}{}
 				}
 			}
 
-			data, err := json.Marshal(currentNames)
+			data, err := json.Marshal(currentPlayers)
 			if err != nil {
 				errors++
 				continue
