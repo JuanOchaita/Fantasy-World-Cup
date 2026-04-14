@@ -41,6 +41,7 @@ type myRankResponse struct {
 	SquadName string  `json:"squad_name"`
 	Rank      int64   `json:"rank"`
 	Score     float64 `json:"score"`
+	GameWins  int32   `json:"game_wins"`
 	Message   string  `json:"message,omitempty"`
 }
 
@@ -150,12 +151,26 @@ func (h *ScoringHandler) GetMyRank(c *gin.Context) {
 	}
 
 	rankInfo, err := h.scoringService.GetUserRank(c.Request.Context(), user.Username, squad.SquadName)
+	history, historyErr := h.repo.GetUserScoringHistory(c.Request.Context(), repository.GetUserScoringHistoryParams{
+		UserID: userID,
+		Limit:  500,
+		Offset: 0,
+	})
+	gameWins := int32(0)
+	if historyErr == nil {
+		for _, row := range history {
+			if row.PointsEarned > 0 {
+				gameWins++
+			}
+		}
+	}
 	if err != nil {
 		c.JSON(http.StatusOK, myRankResponse{
 			Username:  user.Username,
 			SquadName: squad.SquadName,
 			Rank:      0,
 			Score:     nullInt32ToFloat64(squad.TotalPoints),
+			GameWins:  gameWins,
 			Message:   "aun no estas en el ranking de Redis (sincronizando...)",
 		})
 		return
@@ -166,6 +181,7 @@ func (h *ScoringHandler) GetMyRank(c *gin.Context) {
 		SquadName: rankInfo.SquadName,
 		Rank:      rankInfo.Rank,
 		Score:     rankInfo.Score,
+		GameWins:  gameWins,
 	})
 }
 

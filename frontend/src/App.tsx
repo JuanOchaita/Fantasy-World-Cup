@@ -13,6 +13,7 @@ import SearchPage from "./pages/Search";
 import SquadPage from "./pages/Squad";
 import LeaderboardPage from "./pages/Leaderboard";
 import ProfilePage from "./pages/Profile";
+import AdminPage from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,12 @@ const AppInit = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const AdminOnlyRoute = () => {
+  const user = useAuthStore(s => s.user);
+  if (user?.username === 'admin') return <AdminPage />;
+  return <Navigate to="/dashboard" replace />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -30,6 +37,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AppInit>
+          {/*
+            Keep admin access client-side restricted to the dedicated admin user.
+          */}
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -40,6 +50,7 @@ const App = () => (
               <Route path="/squad" element={<SquadPage />} />
               <Route path="/leaderboard" element={<LeaderboardPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/admin" element={<AdminOnlyRoute />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

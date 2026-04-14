@@ -1,15 +1,11 @@
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trophy, Users, TrendingUp, Calendar } from 'lucide-react';
+import { Trophy, TrendingUp, Calendar, Wallet, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { Link } from 'react-router-dom';
 import AppLayout from '@/components/AppLayout';
-
-const stats = [
-  { label: 'Squad Points', value: '—', icon: Trophy, color: 'text-primary' },
-  { label: 'Players', value: '0/11', icon: Users, color: 'text-gold-light' },
-  { label: 'Global Rank', value: '—', icon: TrendingUp, color: 'text-primary' },
-  { label: 'Matchday', value: '1', icon: Calendar, color: 'text-gold-light' },
-];
+import { squadService, mapSquadDetails } from '@/services/squad';
+import { leaderboardService } from '@/services/leaderboard';
 
 const quickActions = [
   { label: 'Build Your Squad', to: '/squad', desc: 'Pick your starting XI' },
@@ -19,6 +15,52 @@ const quickActions = [
 
 const Dashboard = () => {
   const { user } = useAuthStore();
+  const [loading, setLoading] = useState(true);
+  const [globalRank, setGlobalRank] = useState<number | null>(null);
+  const [squadPoints, setSquadPoints] = useState<number>(0);
+  const [gameWins, setGameWins] = useState<number>(0);
+  const [budgetLeft, setBudgetLeft] = useState<number>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDashboard = async () => {
+      setLoading(true);
+      try {
+        const [squadRaw, myRank] = await Promise.all([squadService.getDetails(), leaderboardService.getAroundUser()]);
+        if (cancelled) return;
+        const squad = mapSquadDetails(squadRaw);
+        setGlobalRank(myRank.rank > 0 ? myRank.rank : null);
+        setSquadPoints(squad.totalPoints);
+        setGameWins(myRank.game_wins ?? 0);
+        setBudgetLeft(squad.budgetRemaining);
+      } catch {
+        if (!cancelled) {
+          setGlobalRank(null);
+          setSquadPoints(0);
+          setGameWins(0);
+          setBudgetLeft(0);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadDashboard();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const stats = useMemo(
+    () => [
+      { label: 'Global Rank', value: globalRank ? `#${globalRank}` : '—', icon: TrendingUp, color: 'text-primary' },
+      { label: 'Squad Points', value: String(squadPoints), icon: Trophy, color: 'text-gold-light' },
+      { label: 'Game Wins', value: String(gameWins), icon: Calendar, color: 'text-primary' },
+      { label: 'Budget Left', value: `£${budgetLeft.toFixed(1)}m`, icon: Wallet, color: 'text-gold-light' },
+    ],
+    [globalRank, squadPoints, gameWins, budgetLeft]
+  );
 
   return (
     <AppLayout>
@@ -39,7 +81,9 @@ const Dashboard = () => {
               className="glass-card rounded-xl p-5"
             >
               <stat.icon className={`h-5 w-5 ${stat.color} mb-2`} />
-              <p className="text-2xl font-display text-foreground">{stat.value}</p>
+              <p className="text-2xl font-display text-foreground">
+                {loading ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : stat.value}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
             </motion.div>
           ))}

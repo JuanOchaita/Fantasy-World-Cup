@@ -9,10 +9,18 @@ export interface LeaderboardEntry {
   gameweekPoints: number;
 }
 
+export interface MyRankResponse {
+  username: string;
+  squad_name: string;
+  rank: number;
+  score: number;
+  game_wins: number;
+  message?: string;
+}
+
 export const leaderboardService = {
   getGlobal: (page = 1, limit = 50) =>
-    request<{ entries: LeaderboardEntry[]; total: number; page: number }>(`/leaderboard?page=${page}&limit=${limit}`),
+    request<{ page: number; limit: number; items: LeaderboardEntry[] }>(`/leaderboard?page=${page}&limit=${limit}`),
 
-  getAroundUser: () =>
-    request<{ entries: LeaderboardEntry[]; userRank: number }>('/leaderboard/me'),
+  getAroundUser: () => request<MyRankResponse>('/leaderboard/me'),
 };

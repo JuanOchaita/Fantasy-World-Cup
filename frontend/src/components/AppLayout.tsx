@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { Trophy, Users, Search, LayoutDashboard, User, LogOut, Menu, X } from 'lucide-react';
+import { Trophy, Users, Search, LayoutDashboard, User, LogOut, Menu, X, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -9,6 +9,7 @@ const navItems = [
   { to: '/squad', label: 'Squad', icon: Users },
   { to: '/search', label: 'Players', icon: Search },
   { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+  { to: '/admin', label: 'Admin', icon: ShieldCheck },
   { to: '/profile', label: 'Profile', icon: User },
 ];
 
@@ -17,6 +18,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const visibleNavItems = navItems.filter(item => item.to !== '/admin' || user?.username === 'admin');
 
   const handleLogout = async () => {
     await logout();
@@ -35,7 +38,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const active = location.pathname === item.to;
               return (
                 <Link
@@ -77,7 +80,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               className="md:hidden overflow-hidden border-t border-border/20"
             >
               <div className="container py-3 space-y-1">
-                {navItems.map((item) => {
+                {visibleNavItems.map((item) => {
                   const active = location.pathname === item.to;
                   return (
                     <Link
