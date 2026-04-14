@@ -40,8 +40,13 @@ func getEnv(key, fallback string) string {
 }
 
 type Player struct {
-	LongName string `json:"long_name"`
-	Overall  int    `json:"overall"`
+	PlayerID        int     `json:"player_id"`
+	LongName        string  `json:"long_name"`
+	Overall         int     `json:"overall"`
+	PlayerPositions string  `json:"player_positions"`
+	ValueEUR        int64   `json:"value_eur"`
+	ClubName        string  `json:"club_name"`
+	NationalityName string  `json:"nationality_name"`
 }
 
 func createIndex() error {
@@ -80,6 +85,7 @@ func createIndex() error {
 		},
 		"mappings": map[string]any{
 			"properties": map[string]any{
+				// ── búsqueda principal ──────────────────────────────────────
 				"long_name": map[string]any{
 					"type":     "text",
 					"analyzer": "standard",
@@ -94,9 +100,25 @@ func createIndex() error {
 						},
 					},
 				},
-				// overall stored as integer for sorting within tie-break groups
+				// ── identificador ──────────────────────────────────────────
+				"player_id": map[string]any{
+					"type": "integer",
+				},
+				// ── campos de filtro ───────────────────────────────────────
 				"overall": map[string]any{
 					"type": "integer",
+				},
+				"value_eur": map[string]any{
+					"type": "long",
+				},
+				"player_positions": map[string]any{
+					"type": "keyword",
+				},
+				"club_name": map[string]any{
+					"type": "keyword",
+				},
+				"nationality_name": map[string]any{
+					"type": "keyword",
 				},
 			},
 		},
@@ -201,10 +223,18 @@ func main() {
 		log.Fatalf("failed to setup index: %v", err)
 	}
 
-	// Now also fetching overall for tiebreaking within same relevance group
 	rows, err := db.QueryContext(
 		context.Background(),
-		"SELECT long_name::text, COALESCE(overall, 0) FROM players WHERE long_name IS NOT NULL AND long_name != ''",
+		`SELECT
+			player_id,
+			long_name::text,
+			COALESCE(overall, 0),
+			COALESCE(player_positions, ''),
+			COALESCE(value_eur, 0),
+			COALESCE(club_name, ''),
+			COALESCE(nationality_name, '')
+		FROM players
+		WHERE long_name IS NOT NULL AND long_name != ''`,
 	)
 	if err != nil {
 		log.Fatalf("failed to query players: %v", err)
@@ -218,9 +248,16 @@ func main() {
 	)
 
 	for rows.Next() {
-		var name string
-		var overall int
-		if err := rows.Scan(&name, &overall); err != nil {
+		var (
+			playerID        int
+			name            string
+			overall         int
+			playerPositions string
+			valueEUR        int64
+			clubName        string
+			nationalityName string
+		)
+		if err := rows.Scan(&playerID, &name, &overall, &playerPositions, &valueEUR, &clubName, &nationalityName); err != nil {
 			log.Printf("scan error: %v", err)
 			continue
 		}
@@ -228,7 +265,15 @@ func main() {
 		if name == "" {
 			continue
 		}
-		batch = append(batch, Player{LongName: name, Overall: overall})
+		batch = append(batch, Player{
+			PlayerID:        playerID,
+			LongName:        name,
+			Overall:         overall,
+			PlayerPositions: playerPositions,
+			ValueEUR:        valueEUR,
+			ClubName:        clubName,
+			NationalityName: nationalityName,
+		})
 		total++
 
 		if len(batch) >= batchSize {
