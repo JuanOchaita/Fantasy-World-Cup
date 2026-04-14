@@ -123,6 +123,13 @@ export const squadService = {
       body: JSON.stringify({ player_id: playerId, slot }),
     }),
 
+  removePlayer: async (playerId: number) => {
+    return request<{ message: string }>('/squad/players', {
+      method: 'DELETE',
+      body: JSON.stringify({ player_id: playerId }),
+    });
+  },
+
   changeFormation: (formation: string) =>
     request<ApiSquadRow>('/squad/formation', {
       method: 'PATCH',

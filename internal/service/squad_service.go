@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 
 	"github.com/delta/fantasy-world-cup/internal/repository"
 )
@@ -49,16 +50,16 @@ type SquadDetails struct {
 
 func toSquadDTO(s repository.Squad) SquadDTO {
 	formation := ""
-	if s.Formation != nil {
-		formation = *s.Formation
+	if s.Formation.Valid {
+		formation = s.Formation.String
 	}
 	budgetUsed := int64(0)
-	if s.BudgetUsed != nil {
-		budgetUsed = *s.BudgetUsed
+	if s.BudgetUsed.Valid {
+		budgetUsed = s.BudgetUsed.Int64
 	}
 	totalPoints := int64(0)
-	if s.TotalPoints != nil {
-		totalPoints = *s.TotalPoints
+	if s.TotalPoints.Valid {
+		totalPoints = int64(s.TotalPoints.Int32)
 	}
 	return SquadDTO{
 		SquadID:     s.SquadID,
@@ -71,36 +72,33 @@ func toSquadDTO(s repository.Squad) SquadDTO {
 }
 
 func toPlayerDTO(p repository.GetSquadPlayersRow) SquadPlayerDTO {
-	nullStr := func(s interface{ String() string }) string { return "" }
-	_ = nullStr
-
 	shortName := ""
-	if p.ShortName != nil {
-		shortName = *p.ShortName
+	if p.ShortName.Valid {
+		shortName = p.ShortName.String
 	}
 	longName := ""
-	if p.LongName != nil {
-		longName = *p.LongName
+	if p.LongName.Valid {
+		longName = p.LongName.String
 	}
 	positions := ""
-	if p.PlayerPositions != nil {
-		positions = *p.PlayerPositions
+	if p.PlayerPositions.Valid {
+		positions = p.PlayerPositions.String
 	}
 	nationality := ""
-	if p.NationalityName != nil {
-		nationality = *p.NationalityName
+	if p.NationalityName.Valid {
+		nationality = p.NationalityName.String
 	}
 	club := ""
-	if p.ClubName != nil {
-		club = *p.ClubName
+	if p.ClubName.Valid {
+		club = p.ClubName.String
 	}
 	slot := ""
-	if p.PositionSlot != nil {
-		slot = *p.PositionSlot
+	if p.PositionSlot.Valid {
+		slot = p.PositionSlot.String
 	}
 	valueEur := int64(0)
-	if p.ValueEur != nil {
-		valueEur = *p.ValueEur
+	if p.ValueEur.Valid {
+		valueEur = p.ValueEur.Int64
 	}
 	return SquadPlayerDTO{
 		PlayerID:        p.PlayerID,
@@ -126,8 +124,8 @@ func (s *SquadService) GetOrCreateSquad(ctx context.Context, userID int32, name,
 	return s.repo.CreateSquad(ctx, repository.CreateSquadParams{
 		UserID:     userID,
 		SquadName:  name,
-		Formation:  &formation,
-		BudgetUsed: &budget,
+		Formation:  sql.NullString{String: formation, Valid: formation != ""},
+		BudgetUsed: sql.NullInt64{Int64: budget, Valid: true},
 	})
 }
 
@@ -139,7 +137,7 @@ func (s *SquadService) ChangeFormation(ctx context.Context, userID int32, format
 
 	return s.repo.UpdateSquadFormation(ctx, repository.UpdateSquadFormationParams{
 		SquadID:   squad.SquadID,
-		Formation: &formation,
+		Formation: sql.NullString{String: formation, Valid: true},
 	})
 }
 
@@ -159,7 +157,7 @@ func (s *SquadService) UpdateProfile(ctx context.Context, userID int32, name, fo
 	return s.repo.UpdateSquadProfile(ctx, repository.UpdateSquadProfileParams{
 		SquadID:   squad.SquadID,
 		SquadName: name,
-		Formation: &formation,
+		Formation: sql.NullString{String: formation, Valid: true},
 	})
 }
 
@@ -184,8 +182,8 @@ func (s *SquadService) AddPlayer(ctx context.Context, userID int32, playerID int
 
 	price := s.playerService.CalculatePrice(player.ValueEur.Int64)
 	currentBudget := int64(0)
-	if squad.BudgetUsed != nil {
-		currentBudget = *squad.BudgetUsed
+	if squad.BudgetUsed.Valid {
+		currentBudget = squad.BudgetUsed.Int64
 	}
 	newBudget := float64(currentBudget)/100.0 + price
 	if newBudget > MaxBudget {
@@ -215,7 +213,59 @@ func (s *SquadService) AddPlayer(ctx context.Context, userID int32, playerID int
 	value := int64(newBudget * 100)
 	_, err = s.repo.UpdateSquadBudget(ctx, repository.UpdateSquadBudgetParams{
 		SquadID:    squad.SquadID,
-		BudgetUsed: &value,
+		BudgetUsed: sql.NullInt64{Int64: value, Valid: true},
+	})
+	return err
+}
+
+func (s *SquadService) RemovePlayer(ctx context.Context, userID int32, playerID int32) error {
+	squad, err := s.repo.GetSquadByUserID(ctx, userID)
+	if err != nil {
+		return errors.New("debes crear una escuadra primero")
+	}
+
+	players, err := s.repo.GetSquadPlayers(ctx, squad.SquadID)
+	if err != nil {
+		return err
+	}
+
+	var target *repository.GetSquadPlayersRow
+	for i := range players {
+		if players[i].PlayerID == playerID {
+			target = &players[i]
+			break
+		}
+	}
+	if target == nil {
+		return errors.New("el jugador no esta en tu escuadra")
+	}
+
+	valueEur := int64(0)
+	if target.ValueEur.Valid {
+		valueEur = target.ValueEur.Int64
+	}
+	price := s.playerService.CalculatePrice(valueEur)
+
+	if err := s.repo.RemovePlayerFromSquad(ctx, repository.RemovePlayerFromSquadParams{
+		SquadID:  squad.SquadID,
+		PlayerID: playerID,
+	}); err != nil {
+		return err
+	}
+
+	currentBudgetCents := int64(0)
+	if squad.BudgetUsed.Valid {
+		currentBudgetCents = squad.BudgetUsed.Int64
+	}
+	priceCents := int64(math.Round(price * 100))
+	newBudgetCents := currentBudgetCents - priceCents
+	if newBudgetCents < 0 {
+		newBudgetCents = 0
+	}
+
+	_, err = s.repo.UpdateSquadBudget(ctx, repository.UpdateSquadBudgetParams{
+		SquadID:    squad.SquadID,
+		BudgetUsed: sql.NullInt64{Int64: newBudgetCents, Valid: true},
 	})
 	return err
 }

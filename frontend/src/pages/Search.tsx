@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Search as SearchIcon, X, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/components/AppLayout';
 import { playerService, mapPlayerApiRow, type Player } from '@/services/players';
-import { mapSquadDetails, squadService } from '@/services/squad';
+import { mapSquadDetails, squadService, type Squad } from '@/services/squad';
 import { firstEmptySlotForPosition, getFormationShape, getFormationSlots } from '@/lib/squadSlots';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,6 +25,19 @@ const SearchPage = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [squad, setSquad] = useState<Squad | null>(null);
+  const [squadLoading, setSquadLoading] = useState(true);
+
+  const refreshSquad = useCallback(async () => {
+    try {
+      const details = await squadService.getDetails();
+      setSquad(mapSquadDetails(details));
+    } catch {
+      setSquad(null);
+    } finally {
+      setSquadLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +65,10 @@ const SearchPage = () => {
     };
   }, []);
 
+  useEffect(() => {
+    refreshSquad();
+  }, [refreshSquad]);
+
   const filtered = useMemo(
     () =>
       players.filter(
@@ -65,10 +82,17 @@ const SearchPage = () => {
   const handleAdd = async (player: Player) => {
     setAddingId(player.id);
     try {
-      const details = await squadService.getDetails();
-      const squad = mapSquadDetails(details);
-      const formation = squad.formation || '4-3-3';
-      const filled = new Set(squad.players.map(p => p.positionSlot || '').filter(Boolean));
+      const currentSquad = squad ?? mapSquadDetails(await squadService.getDetails());
+      if (!currentSquad) {
+        toast({
+          title: 'No squad found',
+          description: 'Create a squad first before adding players.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const formation = currentSquad.formation || '4-3-3';
+      const filled = new Set(currentSquad.players.map(p => p.positionSlot || '').filter(Boolean));
       const totalSlots = getFormationSlots(formation).length;
       if (filled.size >= totalSlots) {
         toast({ title: 'Squad full', description: `Your ${formation} already has 11 players.`, variant: 'destructive' });
@@ -95,6 +119,7 @@ const SearchPage = () => {
         return;
       }
       await squadService.addPlayer(Number(player.id), slot);
+      await refreshSquad();
       toast({ title: 'Player added', description: `${player.name} → ${slot}` });
     } catch (e) {
       toast({
@@ -107,6 +132,9 @@ const SearchPage = () => {
     }
   };
 
+  const spentBudget = squad ? squad.budget - squad.budgetRemaining : 0;
+  const budgetRemaining = squad ? squad.budgetRemaining : 0;
+
   return (
     <AppLayout>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -114,6 +142,31 @@ const SearchPage = () => {
         <p className="text-sm text-muted-foreground">
           Browsing the player pool (client-side filters). Server-side name search is not connected yet.
         </p>
+
+        <div className="glass-card rounded-xl p-4">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Budget monitor</p>
+          {squadLoading ? (
+            <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading squad budget...
+            </div>
+          ) : (
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+              <div className="rounded-md bg-muted/40 p-3">
+                <p className="text-muted-foreground">Total</p>
+                <p className="font-display text-foreground">£100.0m</p>
+              </div>
+              <div className="rounded-md bg-muted/40 p-3">
+                <p className="text-muted-foreground">Used</p>
+                <p className="font-display text-foreground">£{spentBudget.toFixed(1)}m</p>
+              </div>
+              <div className="rounded-md bg-muted/40 p-3">
+                <p className="text-muted-foreground">Remaining</p>
+                <p className="font-display text-primary">£{budgetRemaining.toFixed(1)}m</p>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="flex gap-3">
           <div className="relative flex-1">

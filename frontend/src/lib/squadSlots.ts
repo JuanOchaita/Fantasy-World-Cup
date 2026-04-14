@@ -30,7 +30,7 @@ function parseFormation(formation: string): FormationShape {
 
 function linePositions(count: number): string[] {
   if (count <= 1) return ['50%'];
-  const pad = 15;
+  const pad = 18;
   const usable = 100 - pad * 2;
   const step = usable / (count - 1);
   return Array.from({ length: count }, (_, i) => `${pad + i * step}%`);
@@ -51,16 +51,16 @@ export function getFormationSlots(formation: string): string[] {
 
 export function getPitchLayout(formation: string): SlotLayout[] {
   const shape = parseFormation(formation);
-  const layout: SlotLayout[] = [{ slot: 'GK', posLabel: 'GK', top: '82%', left: '50%' }];
+  const layout: SlotLayout[] = [{ slot: 'GK', posLabel: 'GK', top: '88%', left: '50%' }];
 
   linePositions(shape.DEF).forEach((left, i) => {
-    layout.push({ slot: `D${i + 1}`, posLabel: 'DEF', top: '62%', left });
+    layout.push({ slot: `D${i + 1}`, posLabel: 'DEF', top: '68%', left });
   });
   linePositions(shape.MID).forEach((left, i) => {
-    layout.push({ slot: `M${i + 1}`, posLabel: 'MID', top: '38%', left });
+    layout.push({ slot: `M${i + 1}`, posLabel: 'MID', top: '45%', left });
   });
   linePositions(shape.FWD).forEach((left, i) => {
-    layout.push({ slot: `F${i + 1}`, posLabel: 'FWD', top: '15%', left });
+    layout.push({ slot: `F${i + 1}`, posLabel: 'FWD', top: '22%', left });
   });
 
   return layout;

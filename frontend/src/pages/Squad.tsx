@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Users, DollarSign, Loader2 } from 'lucide-react';
+import { Users, DollarSign, Loader2, X } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import { squadService, mapSquadDetails } from '@/services/squad';
 import type { Squad } from '@/services/squad';
@@ -17,6 +17,7 @@ const SquadPage = () => {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [removingPlayerId, setRemovingPlayerId] = useState<string | null>(null);
   const [newName, setNewName] = useState('My Squad');
   const [formation, setFormation] = useState('4-3-3');
 
@@ -73,11 +74,52 @@ const SquadPage = () => {
     }
     setSavingProfile(true);
     try {
-      await squadService.updateProfile({ name: trimmedName, formation });
+      if (trimmedName !== squad.name) {
+        try {
+          await squadService.updateProfile({ name: trimmedName, formation: squad.formation });
+        } catch (error) {
+          if (!(error instanceof Error) || !error.message.includes('404')) throw error;
+          toast({
+            title: 'Name update unavailable',
+            description: 'The current backend route does not support squad name updates.',
+            variant: 'destructive',
+          });
+        }
+      }
+
+      if (formation !== squad.formation) {
+        const currentShape = getFormationShape(squad.formation);
+        const nextShape = getFormationShape(formation);
+
+        const overflowPlayers = squad.players.filter(player => {
+          const slot = player.positionSlot || '';
+          if (slot.startsWith('D')) return Number(slot.slice(1)) > nextShape.DEF && nextShape.DEF < currentShape.DEF;
+          if (slot.startsWith('M')) return Number(slot.slice(1)) > nextShape.MID && nextShape.MID < currentShape.MID;
+          if (slot.startsWith('F')) return Number(slot.slice(1)) > nextShape.FWD && nextShape.FWD < currentShape.FWD;
+          return false;
+        });
+
+        if (overflowPlayers.length > 0) {
+          for (const player of overflowPlayers) {
+            await squadService.removePlayer(Number(player.id));
+          }
+        }
+
+        await squadService.changeFormation(formation);
+      }
+
       await load();
       setEditing(false);
-      toast({ title: 'Squad updated', description: 'Name and formation were updated.' });
+      toast({ title: 'Squad updated', description: 'Formation and profile were updated.' });
     } catch (e) {
+      if (e instanceof Error && e.message.includes('404')) {
+        toast({
+          title: 'Cambio de formacion no disponible',
+          description: 'El endpoint PATCH /squad/formation no esta disponible en tu backend actual.',
+          variant: 'destructive',
+        });
+        return;
+      }
       toast({
         title: 'Could not update squad',
         description: e instanceof Error ? e.message : 'Unknown error',
@@ -85,6 +127,23 @@ const SquadPage = () => {
       });
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleRemovePlayer = async (playerId: string, playerName: string) => {
+    setRemovingPlayerId(playerId);
+    try {
+      await squadService.removePlayer(Number(playerId));
+      await load();
+      toast({ title: 'Player removed', description: `${playerName} was removed from your squad.` });
+    } catch (e) {
+      toast({
+        title: 'Could not remove player',
+        description: e instanceof Error ? e.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setRemovingPlayerId(null);
     }
   };
 
@@ -212,10 +271,10 @@ const SquadPage = () => {
         <div className="glass-card rounded-xl overflow-hidden">
           <div
             className="relative w-full"
-            style={{ paddingBottom: '65%', background: 'linear-gradient(180deg, hsl(140 40% 18%) 0%, hsl(140 35% 14%) 100%)' }}
+            style={{ paddingBottom: '140%', background: 'linear-gradient(180deg, hsl(140 40% 18%) 0%, hsl(140 35% 14%) 100%)' }}
           >
-            <div className="absolute inset-4 border-2 border-foreground/10 rounded-lg" />
-            <div className="absolute left-1/2 top-4 bottom-4 w-px bg-foreground/10" />
+            <div className="absolute inset-[8%] border-2 border-foreground/10 rounded-2xl" />
+            <div className="absolute left-[8%] right-[8%] top-1/2 h-px bg-foreground/10" />
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full border-2 border-foreground/10" />
 
             {pitchLayout.map(({ slot, posLabel, top, left }) => {
@@ -227,19 +286,37 @@ const SquadPage = () => {
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.1 }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center max-w-[72px]"
+                  className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center max-w-[96px]"
                   style={{ top, left }}
                 >
-                  <div
-                    className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 flex items-center justify-center text-[10px] sm:text-xs font-display text-center leading-tight px-1 ${
-                      label
-                        ? 'bg-primary/20 border-primary text-foreground'
-                        : 'bg-muted/40 border-dashed border-primary/40 text-primary/60'
-                    }`}
-                  >
-                    {label || '+'}
+                  <div className="relative">
+                    <div
+                      className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 flex items-center justify-center text-[10px] sm:text-xs font-display text-center leading-tight px-1 ${
+                        label
+                          ? 'bg-primary/20 border-primary text-foreground'
+                          : 'bg-muted/40 border-dashed border-primary/40 text-primary/60'
+                      }`}
+                    >
+                      {label || '+'}
+                    </div>
+                    {pl && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePlayer(pl.id, pl.name)}
+                        disabled={removingPlayerId === pl.id}
+                        className="absolute -right-1 -top-1 rounded-full p-1 bg-background/90 border border-border/60 hover:bg-background"
+                        aria-label={`Remove ${pl.name}`}
+                      >
+                        {removingPlayerId === pl.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <X className="h-3 w-3" />
+                        )}
+                      </button>
+                    )}
                   </div>
-                  <span className="text-[10px] sm:text-xs text-foreground/50 mt-1 font-medium">{posLabel}</span>
+                  <span className="text-[10px] sm:text-xs text-foreground/50 mt-1 font-medium">{slot}</span>
+                  <span className="text-[10px] sm:text-xs text-foreground/50 mt-0.5 font-medium">{posLabel}</span>
                 </motion.div>
               );
             })}

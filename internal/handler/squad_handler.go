@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/delta/fantasy-world-cup/internal/service"
 	"github.com/gin-gonic/gin"
@@ -30,6 +31,10 @@ type addPlayerRequest struct {
 	Slot     string `json:"slot" binding:"required"`
 }
 
+type removePlayerRequest struct {
+	PlayerID int32 `json:"player_id"`
+}
+
 func (h *SquadHandler) AddPlayer(c *gin.Context) {
 	userID := c.MustGet("user_id").(int32)
 	var req addPlayerRequest
@@ -45,6 +50,34 @@ func (h *SquadHandler) AddPlayer(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "jugador añadido con exito"})
+}
+
+func (h *SquadHandler) RemovePlayer(c *gin.Context) {
+	userID := c.MustGet("user_id").(int32)
+
+	var playerID int32
+	if raw := c.Param("player_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "player_id invalido"})
+			return
+		}
+		playerID = int32(parsed)
+	} else {
+		var req removePlayerRequest
+		if err := c.ShouldBindJSON(&req); err != nil || req.PlayerID <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "player_id es requerido"})
+			return
+		}
+		playerID = req.PlayerID
+	}
+
+	if err := h.squadService.RemovePlayer(c.Request.Context(), userID, playerID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "jugador eliminado con exito"})
 }
 
 func (h *SquadHandler) InitSquad(c *gin.Context) {
