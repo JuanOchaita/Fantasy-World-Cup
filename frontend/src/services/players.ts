@@ -29,6 +29,25 @@ export interface PlayersListResponse {
   results: PlayerApiRow[];
 }
 
+type GoNullableString = { String?: string; Valid?: boolean } | string | null | undefined;
+type GoNullableInt64 = { Int64?: number; Valid?: boolean } | number | null | undefined;
+
+function readNullableString(value: GoNullableString): string | null {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && value.Valid && typeof value.String === 'string') {
+    return value.String;
+  }
+  return null;
+}
+
+function readNullableNumber(value: GoNullableInt64): number | null {
+  if (typeof value === 'number') return value;
+  if (value && typeof value === 'object' && value.Valid && typeof value.Int64 === 'number') {
+    return value.Int64;
+  }
+  return null;
+}
+
 function mapPosition(posRaw: string): Player['position'] {
   const u = posRaw.toUpperCase();
   if (u.includes('GK')) return 'GK';
@@ -38,15 +57,18 @@ function mapPosition(posRaw: string): Player['position'] {
 }
 
 export function mapPlayerApiRow(p: PlayerApiRow): Player {
-  const name = p.long_name?.trim() || p.short_name?.trim() || `Player #${p.player_id}`;
-  const posStr = p.player_positions || '';
+  const name =
+    readNullableString(p.long_name) ??
+    readNullableString(p.short_name) ??
+    `Player #${p.player_id}`;
+  const posStr = readNullableString(p.player_positions) || '';
   return {
     id: String(p.player_id),
     name,
     position: mapPosition(posStr || 'MID'),
-    team: p.nationality_name?.trim() || p.club_name?.trim() || '—',
-    nationality: p.nationality_name?.trim() || '—',
-    price: p.fantasy_price,
+    team: readNullableString(p.nationality_name) ?? readNullableString(p.club_name) ?? '—',
+    nationality: readNullableString(p.nationality_name) ?? '—',
+    price: readNullableNumber(p.fantasy_price) ?? 0,
     points: 0,
     imageUrl: undefined,
   };

@@ -21,6 +21,8 @@ const SquadPage = () => {
   const load = async () => {
     setLoading(true);
     try {
+      // POST /squad is GetOrCreate in backend; this avoids initial 404 on first visit.
+      await squadService.ensureSquad({ name: newName.trim() || 'My Squad', formation });
       const raw = await squadService.getDetails();
       setSquad(mapSquadDetails(raw));
     } catch (e) {

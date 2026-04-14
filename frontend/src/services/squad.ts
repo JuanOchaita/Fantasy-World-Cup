@@ -39,9 +39,36 @@ export interface Squad {
 
 const BUDGET_CAP = 100;
 
+type GoNullableString = { String?: string; Valid?: boolean } | string | null | undefined;
+type GoNullableInt32 = { Int32?: number; Valid?: boolean } | number | null | undefined;
+type GoNullableInt64 = { Int64?: number; Valid?: boolean } | number | null | undefined;
+
+function readNullableString(value: GoNullableString): string | null {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && value.Valid && typeof value.String === 'string') {
+    return value.String;
+  }
+  return null;
+}
+
+function readNullableNumber(value: GoNullableInt32 | GoNullableInt64): number | null {
+  if (typeof value === 'number') return value;
+  if (!value || typeof value !== 'object' || !value.Valid) return null;
+  if ('Int64' in value && typeof value.Int64 === 'number') return value.Int64;
+  if ('Int32' in value && typeof value.Int32 === 'number') return value.Int32;
+  return null;
+}
+
 function mapSquadPlayerRow(r: SquadPlayerRow): Player {
-  const name = r.long_name?.trim() || r.short_name?.trim() || `Player #${r.player_id}`;
-  const posRaw = (r.player_positions || r.club_name || 'MID').toUpperCase();
+  const name =
+    readNullableString(r.long_name) ??
+    readNullableString(r.short_name) ??
+    `Player #${r.player_id}`;
+  const posRaw = (
+    readNullableString(r.player_positions) ??
+    readNullableString(r.club_name) ??
+    'MID'
+  ).toUpperCase();
   let position: Player['position'] = 'MID';
   if (posRaw.includes('GK')) position = 'GK';
   else if (/LB|RB|CB|LWB|RWB|DEF|DF/.test(posRaw)) position = 'DEF';
@@ -51,22 +78,23 @@ function mapSquadPlayerRow(r: SquadPlayerRow): Player {
     id: String(r.player_id),
     name,
     position,
-    team: r.nationality_name?.trim() || r.club_name?.trim() || '—',
-    nationality: r.nationality_name?.trim() || '—',
+    team: readNullableString(r.nationality_name) ?? readNullableString(r.club_name) ?? '—',
+    nationality: readNullableString(r.nationality_name) ?? '—',
     price: 0,
     points: 0,
-    positionSlot: r.position_slot?.trim() || undefined,
+    positionSlot: readNullableString(r.position_slot) ?? undefined,
   };
 }
 
 export function mapSquadDetails(res: SquadDetailsResponse): Squad {
-  const spent = (res.squad.budget_used ?? 0) / 100;
+  const spent = (readNullableNumber(res.squad.budget_used) ?? 0) / 100;
+  const players = Array.isArray(res.players) ? res.players : [];
   return {
     id: String(res.squad.squad_id),
     name: res.squad.squad_name,
-    players: res.players.map(mapSquadPlayerRow),
-    formation: res.squad.formation || '4-3-3',
-    totalPoints: res.squad.total_points ?? 0,
+    players: players.map(mapSquadPlayerRow),
+    formation: readNullableString(res.squad.formation) ?? '4-3-3',
+    totalPoints: readNullableNumber(res.squad.total_points) ?? 0,
     budget: BUDGET_CAP,
     budgetRemaining: Math.max(0, BUDGET_CAP - spent),
   };
@@ -75,16 +103,19 @@ export function mapSquadDetails(res: SquadDetailsResponse): Squad {
 export const squadService = {
   getDetails: () => request<SquadDetailsResponse>('/squad'),
 
+  ensureSquad: (data: { name: string; formation: string }) =>
+    request<ApiSquadRow>('/squad', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   getMySquad: async (): Promise<Squad> => {
     const d = await squadService.getDetails();
     return mapSquadDetails(d);
   },
 
   initSquad: (data: { name: string; formation: string }) =>
-    request<ApiSquadRow>('/squad', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+    squadService.ensureSquad(data),
 
   addPlayer: (playerId: number, slot: string) =>
     request<{ message: string }>('/squad/players', {
