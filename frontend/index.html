@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fantasy World Cup 2026 - Test Bench</title>
+    <title>Fantasy World Cup 2026 - Control Panel</title>
     <link rel="stylesheet" href="/web/static/style.css">
 </head>
 <body>
@@ -16,21 +16,42 @@
         <!-- Auth Section -->
         <section id="auth-section">
             <h2>Registro / Login</h2>
-            <input type="email" id="email" placeholder="Email">
-            <input type="text" id="username" placeholder="Usuario (solo registro)">
-            <input type="password" id="password" placeholder="Contraseña">
-            <div class="actions">
-                <button onclick="register()">Registrar</button>
-                <button onclick="login()">Login</button>
+            <div class="form-group">
+                <input type="email" id="email" placeholder="Email">
+                <input type="text" id="username" placeholder="Usuario (registro)">
+                <input type="password" id="password" placeholder="Contraseña">
+                <div class="actions">
+                    <button onclick="register()">Registrar</button>
+                    <button onclick="login()">Login</button>
+                </div>
             </div>
+        </section>
+
+        <!-- Dashboard / Leaderboard (Principal) -->
+        <section id="dashboard-section" class="hidden">
+            <h2>Mi Desempeño</h2>
+            <div id="my-rank-info" class="rank-card">
+                Cargando tu posición...
+            </div>
+            <hr>
+            <h2>Ranking Global</h2>
+            <button onclick="getLeaderboard()">Actualizar Ranking</button>
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Puesto</th>
+                        <th>Usuario | Escuadra</th>
+                        <th>Puntos</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-list"></tbody>
+            </table>
         </section>
 
         <!-- Search Section -->
         <section id="search-section" class="hidden">
             <h2>Buscador de Jugadores</h2>
-            <div class="search-bar">
-                <input type="text" id="search-input" placeholder="Nombre del jugador..." oninput="searchPlayers()">
-            </div>
+            <input type="text" id="search-input" placeholder="Buscar jugadores..." oninput="searchPlayers()">
             <div id="player-results" class="grid"></div>
         </section>
 
@@ -43,16 +64,9 @@
             <div id="squad-list" class="grid"></div>
         </section>
 
-        <!-- Leaderboard Section -->
-        <section id="leaderboard-section">
-            <h2>Leaderboard Global (Redis)</h2>
-            <button onclick="getLeaderboard()">Actualizar Ranking</button>
-            <ul id="leaderboard-list"></ul>
-        </section>
-
         <!-- Admin Section -->
         <section id="admin-section">
-            <h2 style="color: var(--primary);">PANEL DEL PROFESOR (Simulado Admin)</h2>
+            <h2>Panel del Profesor (Simulado Admin)</h2>
             <div class="actions">
                 <input type="number" id="nation-a-id" placeholder="ID Nacion A">
                 <input type="number" id="nation-b-id" placeholder="ID Nacion B">
@@ -60,7 +74,6 @@
                 <input type="number" id="score-b" placeholder="Goles B">
                 <button onclick="postMatchResult()">Postear Resultado</button>
             </div>
-            <p><small>Puntos: Victoria +3, Empate +1, Derrota 0.</small></p>
         </section>
     </main>
 

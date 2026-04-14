@@ -3,7 +3,7 @@
 Tu misión es gestionar el ranking global y la persistencia de sesiones utilizando **Redis**.
 
 ### 1. Gestión del Leaderboard (Sorted Sets)
-El Backend ya sincroniza los puntos de las escuadras con Redis; aunque creo que lo puede hacer mejor @galina
+El Backend ya sincroniza los puntos de las escuadras con Redis; aunque creo que lo puede hacer mejor 
 - **Key**: `global_leaderboard` (Tipo: Sorted Set).
 - **Lógica de Grabación**: El Backend ejecuta `ZADD` cada vez que se procesa un resultado de partido.
 - **Tu Objetivo**: Optimizar la lectura del ranking y, opcionalmente, implementar lógica de "Rango del Usuario" (usando `ZREVRANK`) para mostrar la posición exacta del jugador en el Dashboard.

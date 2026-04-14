@@ -86,3 +86,25 @@ func (s *AuthService) GenerateTokenPair(ctx context.Context, userID int32) (Toke
 
 	return TokenPair{AccessToken: at, RefreshToken: rt}, nil
 }
+
+func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (TokenPair, error) {
+	// 1. Verificar si el token existe en Redis
+	userID, err := s.rdb.Get(ctx, refreshToken).Int()
+	if err != nil {
+		return TokenPair{}, errors.New("refresh token invalido o expirado")
+	}
+
+	// 2. Opcional: Validar JWT (firma y expiración)
+	token, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
+		return s.jwtKey, nil
+	})
+	if err != nil || !token.Valid {
+		return TokenPair{}, errors.New("refresh token invalido")
+	}
+
+	// 3. Eliminar el token viejo (Estrategia de Rotación)
+	s.rdb.Del(ctx, refreshToken)
+
+	// 4. Generar nuevo par
+	return s.GenerateTokenPair(ctx, int32(userID))
+}
