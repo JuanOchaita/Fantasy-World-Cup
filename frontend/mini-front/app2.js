@@ -115,8 +115,23 @@ async function loadLeaderboard() {
   }
 }
 
-async function loadMyRank() {
-  myRankCard.innerHTML = `<p class="muted">Mi posición requiere sesión iniciada.</p>`;
+async function loadMyRank() { //esto esta harcodeado
+  try {
+    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzYxMzQxNjMsInVzZXJfaWQiOjV9.5Y4DopB9FfJL-mdGTvMkNfKPojMO2wm8GkQ0N-DLtyM";
+    
+    const res = await fetch(`${API_BASE}/leaderboard/me`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    const data = await res.json();
+    renderMyRank(data);
+  } catch (error) {
+    myRankCard.innerHTML = `<p class="muted">Error cargando tu posición.</p>`;
+  }
 }
 
 async function refreshAll() {
