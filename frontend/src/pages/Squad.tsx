@@ -207,6 +207,7 @@ const SquadPage = () => {
   const spent = squad.budget - squad.budgetRemaining;
   const shape = getFormationShape(squad.formation);
   const pitchLayout = getPitchLayout(squad.formation);
+  const horizontalCenterOffset = '3.5%';
   const slotRows = pitchLayout.map(({ slot, posLabel }) => ({
     slot,
     posLabel,
@@ -300,7 +301,7 @@ const SquadPage = () => {
           </div>
         )}
 
-        <div className="glass-card rounded-xl overflow-hidden max-w-3xl mx-auto">
+        <div className="glass-card rounded-xl overflow-hidden max-w-[788px] mx-auto">
           <div
             className="relative w-full"
             style={{ paddingBottom: '95%', background: 'linear-gradient(180deg, hsl(140 40% 18%) 0%, hsl(140 35% 14%) 100%)' }}
@@ -311,7 +312,14 @@ const SquadPage = () => {
 
             {pitchLayout.map(({ slot, posLabel, top, left }) => {
               const pl = squad.players.find(p => p.positionSlot === slot);
-              const label = pl ? pl.name.split(' ').slice(0, 2).join(' ') : '';
+              const label = pl
+                ? (() => {
+                    const parts = pl.name.trim().split(/\s+/).filter(Boolean);
+                    if (parts.length >= 2) return `${parts[0][0]} ${parts[1]}`;
+                    if (parts.length === 1) return parts[0];
+                    return '';
+                  })()
+                : '';
               return (
                 <motion.div
                   key={slot}
@@ -319,7 +327,7 @@ const SquadPage = () => {
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.1 }}
                   className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center max-w-[96px]"
-                  style={{ top, left }}
+                  style={{ top, left: `calc(${left} - ${horizontalCenterOffset})` }}
                 >
                   <div className="relative">
                     <div
@@ -329,7 +337,7 @@ const SquadPage = () => {
                           : 'bg-muted/40 border-dashed border-primary/40 text-primary/60'
                       }`}
                     >
-                      {label || '+'}
+                      {label}
                     </div>
                     {pl && (
                       <button

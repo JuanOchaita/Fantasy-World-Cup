@@ -67,7 +67,7 @@ export function getPitchLayout(formation: string): SlotLayout[] {
     layout.push({ slot: `D${i + 1}`, posLabel: 'DEF', top: '68%', left: toPitchAlignedLeft(left) });
   });
   linePositions(shape.MID).forEach((left, i) => {
-    layout.push({ slot: `M${i + 1}`, posLabel: 'MID', top: '45%', left: toPitchAlignedLeft(left) });
+    layout.push({ slot: `M${i + 1}`, posLabel: 'MID', top: '46%', left: toPitchAlignedLeft(left) });
   });
   linePositions(shape.FWD).forEach((left, i) => {
     layout.push({ slot: `F${i + 1}`, posLabel: 'FWD', top: '22%', left: toPitchAlignedLeft(left) });
