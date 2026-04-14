@@ -1,5 +1,7 @@
+# FANTASY WORLD CUP - MAKE INTERFACE
 
 setup:
+	@chmod +x scripts/*.sh
 	@./scripts/setup-project.sh
 
 start:
@@ -9,14 +11,16 @@ stop:
 	@./scripts/stop-project.sh
 
 data:
-	@chmod +x scripts/seed-data.sh
 	@./scripts/seed-data.sh
 
 test:
-	@chmod +x scripts/run-tests.sh
 	@./scripts/run-tests.sh
+
+# Flujo Maestro: Configura, levanta y puebla la DB
+build: setup start
+	@$(MAKE) data
 
 generate:
 	docker run --rm -v "$(PWD):/src" -w /src sqlc/sqlc generate
 
-.PHONY: setup start stop data test generate
+.PHONY: setup start stop data test build generate
