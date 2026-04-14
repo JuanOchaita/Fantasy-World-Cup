@@ -1,82 +1,25 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fantasy World Cup 2026 - Control Panel</title>
-    <link rel="stylesheet" href="/web/static/style.css">
-</head>
-<body>
-    <header>
-        <h1>FANTASY WORLD CUP 2026</h1>
-        <div id="auth-status">No autenticado</div>
-    </header>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- TODO: Set the document title to the name of your application -->
+    <title>Fantasy WC 2026 - FIFA World Cup Fantasy League</title>
+    <meta name="description" content="Build your dream FIFA World Cup 2026 fantasy team. Pick players, compete globally, and climb the leaderboard." />
+    <meta name="author" content="Lovable" />
 
-    <main>
-        <!-- Auth Section -->
-        <section id="auth-section">
-            <h2>Registro / Login</h2>
-            <div class="form-group">
-                <input type="email" id="email" placeholder="Email">
-                <input type="text" id="username" placeholder="Usuario (registro)">
-                <input type="password" id="password" placeholder="Contraseña">
-                <div class="actions">
-                    <button onclick="register()">Registrar</button>
-                    <button onclick="login()">Login</button>
-                </div>
-            </div>
-        </section>
+    <!-- TODO: Update og:title to match your application name -->
+    <meta property="og:title" content="Lovable App" />
+    <meta property="og:description" content="Lovable Generated Project" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
-        <!-- Dashboard / Leaderboard (Principal) -->
-        <section id="dashboard-section" class="hidden">
-            <h2>Mi Desempeño</h2>
-            <div id="my-rank-info" class="rank-card">
-                Cargando tu posición...
-            </div>
-            <hr>
-            <h2>Ranking Global</h2>
-            <button onclick="getLeaderboard()">Actualizar Ranking</button>
-            <table class="leaderboard-table">
-                <thead>
-                    <tr>
-                        <th>Puesto</th>
-                        <th>Usuario | Escuadra</th>
-                        <th>Puntos</th>
-                    </tr>
-                </thead>
-                <tbody id="leaderboard-list"></tbody>
-            </table>
-        </section>
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@Lovable" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+  </head>
 
-        <!-- Search Section -->
-        <section id="search-section" class="hidden">
-            <h2>Buscador de Jugadores</h2>
-            <input type="text" id="search-input" placeholder="Buscar jugadores..." oninput="searchPlayers()">
-            <div id="player-results" class="grid"></div>
-        </section>
-
-        <!-- Squad Section -->
-        <section id="squad-section" class="hidden">
-            <h2>Tu Escuadra: <span id="squad-name-display"></span></h2>
-            <div id="squad-info">
-                Presupuesto Usado: $<span id="budget-used">0</span>M / $100M | Puntos: <span id="squad-points">0</span>
-            </div>
-            <div id="squad-list" class="grid"></div>
-        </section>
-
-        <!-- Admin Section -->
-        <section id="admin-section">
-            <h2>Panel del Profesor (Simulado Admin)</h2>
-            <div class="actions">
-                <input type="number" id="nation-a-id" placeholder="ID Nacion A">
-                <input type="number" id="nation-b-id" placeholder="ID Nacion B">
-                <input type="number" id="score-a" placeholder="Goles A">
-                <input type="number" id="score-b" placeholder="Goles B">
-                <button onclick="postMatchResult()">Postear Resultado</button>
-            </div>
-        </section>
-    </main>
-
-    <script src="/web/static/app.js"></script>
-</body>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

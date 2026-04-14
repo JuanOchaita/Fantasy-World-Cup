@@ -32,8 +32,8 @@ const LoginPage = () => {
     try {
       await login(data.email, data.password);
       navigate('/dashboard');
-    } catch {
-      setError('Invalid email or password. Please try again.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Invalid email or password. Please try again.');
     } finally {
       setLoading(false);
     }

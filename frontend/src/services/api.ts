@@ -1,43 +1,35 @@
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1';
 
-// Mock mode: set to false once your real backend is running
-const USE_MOCK = true;
+const AUTH_USER_KEY = 'auth_user';
+const REFRESH_TOKEN_KEY = 'auth_refresh_token';
 
-const mockHandlers: Record<string, (body?: any) => any> = {
-  'POST /auth/login': (body) => {
-    if (!body?.email || !body?.password) throw new Error('Email and password required');
-    return {
-      token: 'mock-jwt-token-' + Date.now(),
-      user: { id: '1', username: body.email.split('@')[0], email: body.email },
-    };
-  },
-  'POST /auth/register': (body) => {
-    if (!body?.username || !body?.email || !body?.password) throw new Error('All fields required');
-    return {
-      token: 'mock-jwt-token-' + Date.now(),
-      user: { id: '1', username: body.username, email: body.email },
-    };
-  },
-  'GET /auth/verify': () => {
-    const token = localStorage.getItem('auth_token');
-    if (!token) throw new Error('No session');
-    return { user: { id: '1', username: 'player', email: 'player@example.com' } };
-  },
-  'POST /auth/logout': () => undefined,
-};
+export function getStoredRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export function setStoredRefreshToken(token: string | null): void {
+  if (token) localStorage.setItem(REFRESH_TOKEN_KEY, token);
+  else localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+export function getStoredAuthUser(): { id: string; username: string; email: string } | null {
+  try {
+    const raw = localStorage.getItem(AUTH_USER_KEY);
+    if (!raw) return null;
+    const u = JSON.parse(raw) as { id: string; username: string; email: string };
+    if (u?.id && u?.username) return u;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredAuthUser(user: { id: string; username: string; email: string } | null): void {
+  if (user) localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  else localStorage.removeItem(AUTH_USER_KEY);
+}
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  if (USE_MOCK) {
-    const method = (options?.method || 'GET').toUpperCase();
-    const key = `${method} ${endpoint}`;
-    const handler = mockHandlers[key];
-    if (handler) {
-      await new Promise((r) => setTimeout(r, 300)); // simulate latency
-      const body = options?.body ? JSON.parse(options.body as string) : undefined;
-      return handler(body) as T;
-    }
-  }
-
   const token = localStorage.getItem('auth_token');
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
@@ -47,18 +39,26 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
       ...options?.headers,
     },
   });
+
+  const text = await res.text();
+  const trimmed = text.trim();
+
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
-    try {
-      const text = await res.text();
-      if (!text.trimStart().startsWith('<')) {
-        const json = JSON.parse(text);
-        msg = json.message || msg;
+    if (trimmed && !trimmed.startsWith('<')) {
+      try {
+        const json = JSON.parse(trimmed) as { error?: string; message?: string };
+        msg = json.error || json.message || msg;
+      } catch {
+        msg = trimmed.slice(0, 200) || msg;
       }
-    } catch {}
+    }
     throw new Error(msg);
   }
-  return res.json();
+
+  if (!trimmed) return undefined as T;
+  return JSON.parse(trimmed) as T;
 }
 
 export default request;
+export { API_BASE };
