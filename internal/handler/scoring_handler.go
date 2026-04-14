@@ -26,8 +26,8 @@ func NewScoringHandler(scoringService *service.ScoringService, repo *repository.
 type matchResultRequest struct {
 	NationAID int32 `json:"nation_a_id" binding:"required"`
 	NationBID int32 `json:"nation_b_id" binding:"required"`
-	ScoreA    int32 `json:"score_a" binding:"required"`
-	ScoreB    int32 `json:"score_b" binding:"required"`
+	ScoreA    int32 `json:"score_a"`
+	ScoreB    int32 `json:"score_b"`
 }
 
 type leaderboardEntryResponse struct {

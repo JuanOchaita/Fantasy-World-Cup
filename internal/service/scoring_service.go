@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 
@@ -79,13 +78,24 @@ func (s *ScoringService) ProcessMatchResult(
 			continue
 		}
 
-		totalAfterMatch := getInt32FromNull(squad.TotalPoints) + matchPoints
+		// Obtenemos el username para usar como member en Redis
+		user, err := s.repo.GetUserByID(ctx, squad.UserID)
+		if err != nil {
+			return fmt.Errorf("get user for squad %d: %w", squad.SquadID, err)
+		}
 
+		// Redis acumula los puntos — es la fuente de verdad
+		newTotal, err := s.rdb.ZIncrBy(ctx, LeaderboardKey, float64(matchPoints), user.Username).Result()
+		if err != nil {
+			return fmt.Errorf("zincrby for user %s: %w", user.Username, err)
+		}
+
+		// Postgres guarda el historial como backup/auditoría
 		_, err = s.repo.CreateMatchUserPoints(ctx, repository.CreateMatchUserPointsParams{
 			MatchID:               match.MatchID,
 			UserID:                squad.UserID,
 			PointsEarned:          matchPoints,
-			TotalPointsAfterMatch: totalAfterMatch,
+			TotalPointsAfterMatch: int32(newTotal),
 		})
 		if err != nil {
 			return fmt.Errorf("create match_user_points for user %d: %w", squad.UserID, err)
@@ -107,29 +117,6 @@ func (s *ScoringService) ProcessMatchResult(
 				)
 			}
 		}
-	}
-
-	// Mantiene la lógica ya existente para actualizar los puntos acumulados.
-	if pointsA > 0 {
-		if err := s.repo.UpdatePointsForNation(ctx, repository.UpdatePointsForNationParams{
-			PlayerID:      pointsA,
-			NationalityID: sql.NullInt32{Int32: nationA, Valid: true},
-		}); err != nil {
-			return fmt.Errorf("update points for nation A: %w", err)
-		}
-	}
-
-	if pointsB > 0 {
-		if err := s.repo.UpdatePointsForNation(ctx, repository.UpdatePointsForNationParams{
-			PlayerID:      pointsB,
-			NationalityID: sql.NullInt32{Int32: nationB, Valid: true},
-		}); err != nil {
-			return fmt.Errorf("update points for nation B: %w", err)
-		}
-	}
-
-	if err := s.SyncLeaderboardToRedis(ctx); err != nil {
-		return fmt.Errorf("sync leaderboard to redis: %w", err)
 	}
 
 	return nil
@@ -219,20 +206,12 @@ func (s *ScoringService) resolveNationName(ctx context.Context, nationID int32) 
 	return fmt.Sprintf("%d", nationID), nil
 }
 
-func getInt32FromNull(v sql.NullInt32) int32 {
-	if v.Valid {
-		return v.Int32
-	}
-	return 0
-}
-
 func (s *ScoringService) SyncLeaderboardToRedis(ctx context.Context) error {
 	const pageSize int32 = 500
+	offset := int32(0)
 
 	pipe := s.rdb.Pipeline()
 	pipe.Del(ctx, LeaderboardKey)
-
-	offset := int32(0)
 
 	for {
 		rows, err := s.repo.GetLeaderboard(ctx, repository.GetLeaderboardParams{
@@ -244,16 +223,13 @@ func (s *ScoringService) SyncLeaderboardToRedis(ctx context.Context) error {
 		}
 
 		for _, entry := range rows {
-			member := entry.Username
 			score := float64(0)
-
 			if entry.TotalPoints.Valid {
 				score = float64(entry.TotalPoints.Int32)
 			}
-
 			pipe.ZAdd(ctx, LeaderboardKey, redis.Z{
 				Score:  score,
-				Member: member,
+				Member: entry.Username,
 			})
 		}
 
@@ -273,10 +249,7 @@ func (s *ScoringService) SyncLeaderboardToRedis(ctx context.Context) error {
 }
 
 func (s *ScoringService) syncLeaderboardOrFail(ctx context.Context) error {
-	if err := s.SyncLeaderboardToRedis(ctx); err != nil {
-		return err
-	}
-	return nil
+	return s.SyncLeaderboardToRedis(ctx)
 }
 
 func (s *ScoringService) GetLeaderboard(ctx context.Context, start, stop int64) ([]redis.Z, error) {
@@ -295,9 +268,7 @@ func (s *ScoringService) GetLeaderboard(ctx context.Context, start, stop int64) 
 }
 
 func (s *ScoringService) GetUserRank(ctx context.Context, username, squadName string) (UserRank, error) {
-	member := username
-
-	rank, err := s.rdb.ZRevRank(ctx, LeaderboardKey, member).Result()
+	rank, err := s.rdb.ZRevRank(ctx, LeaderboardKey, username).Result()
 	if err != nil {
 		log.Println("Rank no encontrado en Redis, sincronizando desde PostgreSQL...")
 
@@ -305,19 +276,19 @@ func (s *ScoringService) GetUserRank(ctx context.Context, username, squadName st
 			return UserRank{}, syncErr
 		}
 
-		rank, err = s.rdb.ZRevRank(ctx, LeaderboardKey, member).Result()
+		rank, err = s.rdb.ZRevRank(ctx, LeaderboardKey, username).Result()
 		if err != nil {
 			return UserRank{}, err
 		}
 	}
 
-	score, err := s.rdb.ZScore(ctx, LeaderboardKey, member).Result()
+	score, err := s.rdb.ZScore(ctx, LeaderboardKey, username).Result()
 	if err != nil {
 		if syncErr := s.syncLeaderboardOrFail(ctx); syncErr != nil {
 			return UserRank{}, syncErr
 		}
 
-		score, err = s.rdb.ZScore(ctx, LeaderboardKey, member).Result()
+		score, err = s.rdb.ZScore(ctx, LeaderboardKey, username).Result()
 		if err != nil {
 			return UserRank{}, err
 		}
