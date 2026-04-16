@@ -125,6 +125,8 @@ const SearchPage = () => {
   const { toast } = useToast();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
+  /** Text sent to Elasticsearch; only set on Enter (or suggestion pick). `null` = no search run yet. */
+  const [submittedSearchQ, setSubmittedSearchQ] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<ExternalSearchResult[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -143,7 +145,12 @@ const SearchPage = () => {
   const [addingId, setAddingId] = useState<string | null>(null);
   const [squad, setSquad] = useState<Squad | null>(null);
   const [squadLoading, setSquadLoading] = useState(true);
+  /** Per search row: which line (GK/DEF/MID/FWD) to place the player when adding. */
+  const [addAsRoleByPlayerId, setAddAsRoleByPlayerId] = useState<Record<string, Player['position']>>({});
   const skipNextSuggestFetchRef = useRef(false);
+
+  const getAddAsRole = (player: Player): Player['position'] =>
+    addAsRoleByPlayerId[player.id] ?? player.position;
 
   const refreshSquad = useCallback(async () => {
     try {
@@ -189,11 +196,18 @@ const SearchPage = () => {
   }, [debouncedQuery]);
 
   useEffect(() => {
+    if (submittedSearchQ === null) {
+      setSearchResults([]);
+      setTotalPages(1);
+      setTotalItems(0);
+      setListLoading(false);
+      return;
+    }
     let cancelled = false;
     setListLoading(true);
     playerService
       .searchAdvanced({
-        q: debouncedQuery || 'a',
+        q: submittedSearchQ,
         page: currentPage,
         size: 50,
         nationality: selectedNationality || undefined,
@@ -226,7 +240,7 @@ const SearchPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, currentPage, selectedNationality, selectedPosition, selectedClub, minOverall, maxOverall, toast]);
+  }, [submittedSearchQ, currentPage, selectedNationality, selectedPosition, selectedClub, minOverall, maxOverall, toast]);
 
   const players = useMemo(
     () =>
@@ -261,6 +275,8 @@ const SearchPage = () => {
     setQuery(s.name);
     setDebouncedQuery(s.name);
     setSuggestions([]);
+    setSubmittedSearchQ(s.name.trim() || 'a');
+    setCurrentPage(1);
     setSelectedPlayerId(s.id);
     void fetchDetail(s.id);
   };
@@ -276,7 +292,7 @@ const SearchPage = () => {
     }
   };
 
-  const handleAdd = async (player: Player) => {
+  const handleAdd = async (player: Player, addAs: Player['position']) => {
     setAddingId(player.id);
     try {
       const currentSquad = squad ?? mapSquadDetails(await squadService.getDetails());
@@ -298,15 +314,15 @@ const SearchPage = () => {
 
       const shape = getFormationShape(formation);
       const positionLabel =
-        player.position === 'GK'
+        addAs === 'GK'
           ? 'GK'
-          : player.position === 'DEF'
+          : addAs === 'DEF'
           ? `DEF (${shape.DEF})`
-          : player.position === 'MID'
+          : addAs === 'MID'
           ? `MID (${shape.MID})`
           : `FWD (${shape.FWD})`;
 
-      const slot = firstEmptySlotForPosition(formation, filled, player.position);
+      const slot = firstEmptySlotForPosition(formation, filled, addAs);
       if (!slot) {
         toast({
           title: 'Position full',
@@ -317,6 +333,11 @@ const SearchPage = () => {
       }
       await squadService.addPlayer(Number(player.id), slot);
       await refreshSquad();
+      setAddAsRoleByPlayerId(prev => {
+        const next = { ...prev };
+        delete next[player.id];
+        return next;
+      });
       toast({ title: 'Player added', description: `${player.name} -> ${slot}` });
     } catch (e) {
       toast({
@@ -337,7 +358,7 @@ const SearchPage = () => {
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
         <h1 className="text-3xl text-gold-gradient">Player Search</h1>
         <p className="text-sm text-muted-foreground">
-          Search uses live services (name suggestions + advanced filters + paginated results).
+          Name suggestions appear while you type; Elasticsearch results load after you press Enter (or pick a suggestion).
         </p>
 
         <div className="glass-card rounded-xl p-4">
@@ -373,9 +394,14 @@ const SearchPage = () => {
                 value={query}
                 onChange={e => {
                   setQuery(e.target.value);
+                }}
+                onKeyDown={e => {
+                  if (e.key !== 'Enter') return;
+                  e.preventDefault();
+                  setSubmittedSearchQ(query.trim() || 'a');
                   setCurrentPage(1);
                 }}
-                placeholder="Search by name..."
+                placeholder="Search by name, then press Enter…"
                 className="pl-10 bg-muted/50 border-border/50"
               />
               {query && (
@@ -385,6 +411,7 @@ const SearchPage = () => {
                     setQuery('');
                     setDebouncedQuery('');
                     setSuggestions([]);
+                    setSubmittedSearchQ(null);
                   }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
@@ -551,14 +578,41 @@ const SearchPage = () => {
                         ))}
                       </div>
                     </button>
-                    <div className="flex items-center gap-4 sm:gap-6 text-sm shrink-0">
+                    <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-4 text-sm shrink-0">
                       <div className="text-right">
                         <p className="text-muted-foreground">Fantasy price</p>
                         <p className="font-display text-primary">£{player.price.toFixed(1)}m</p>
                       </div>
-                      <Button size="sm" className="btn-gold text-xs px-4" disabled={addingId === player.id} onClick={() => handleAdd(player)}>
-                        {addingId === player.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <label htmlFor={`add-as-${player.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
+                          Add as
+                        </label>
+                        <select
+                          id={`add-as-${player.id}`}
+                          value={getAddAsRole(player)}
+                          onChange={e =>
+                            setAddAsRoleByPlayerId(prev => ({
+                              ...prev,
+                              [player.id]: e.target.value as Player['position'],
+                            }))
+                          }
+                          className="rounded-md border border-border/40 bg-muted/40 px-2 py-1.5 text-xs text-foreground min-w-[4.5rem]"
+                        >
+                          {positions.map(pos => (
+                            <option key={pos} value={pos}>
+                              {pos}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          size="sm"
+                          className="btn-gold text-xs px-4"
+                          disabled={addingId === player.id}
+                          onClick={() => handleAdd(player, getAddAsRole(player))}
+                        >
+                          {addingId === player.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}
+                        </Button>
+                      </div>
                     </div>
                   </motion.div>
                 ))}
@@ -580,7 +634,11 @@ const SearchPage = () => {
                 {players.length === 0 && (
                   <div className="text-center py-12 text-muted-foreground">
                     <SearchIcon className="h-8 w-8 mx-auto mb-3 opacity-50" />
-                    <p>No players match your filters</p>
+                    <p>
+                      {submittedSearchQ === null
+                        ? 'Press Enter to search. Filters apply to the next search.'
+                        : 'No players match your filters'}
+                    </p>
                   </div>
                 )}
               </div>

@@ -8,7 +8,8 @@ import (
 	"github.com/delta/fantasy-world-cup/internal/repository"
 )
 
-const MaxValueEur = 174500000.0
+// FantasyPriceEurDivisor matches the UI: fantasy price (£m) = value_eur / 10_000_000.
+const FantasyPriceEurDivisor = 10_000_000.0
 
 type PlayerWithPrice struct {
 	repository.Player
@@ -25,10 +26,10 @@ func NewPlayerService(repo *repository.Queries) *PlayerService {
 
 func (s *PlayerService) CalculatePrice(valueEur int64) float64 {
 	if valueEur <= 0 {
-		return 5.0
+		return 0
 	}
-	price := (float64(valueEur) / MaxValueEur * 15.0) + 5.0
-	return math.Round(price*100) / 100 // Redondear a 2 decimales
+	price := float64(valueEur) / FantasyPriceEurDivisor
+	return math.Round(price*100) / 100
 }
 
 func (s *PlayerService) Search(ctx context.Context, query string, limit, offset int32) ([]PlayerWithPrice, error) {
