@@ -2,7 +2,7 @@
 
 Ecosistema completo de Fantasy Football escalable, con búsqueda instantánea y procesamiento en tiempo real.
 
-## 🚀 Inicio Rápido (Un solo comando)
+## Inicio Rápido (Un solo comando)
 
 Gracias a la dockerización total, puedes levantar la plataforma completa (Frontend, Backend y Servicios de Búsqueda) con:
 
@@ -12,7 +12,7 @@ make build
 
 *(Esto ejecutará la configuración del entorno y el levantamiento de Docker)*.
 
-## 🏗️ Arquitectura Políglota
+## Arquitectura Políglota
 
 La plataforma utiliza múltiples motores para maximizar el rendimiento:
 
@@ -23,7 +23,7 @@ La plataforma utiliza múltiples motores para maximizar el rendimiento:
 - **Búsqueda Rápida (Redis AC)**: Microservicio de autocompletado ultra-rápido.
 - **Frontend Moderno (React/Vite)**: Interfaz de usuario de última generación.
 
-## 🔗 Mapa de Puertos y Servicios
+## Mapa de Puertos y Servicios
 
 | Servicio | URL Local | Descripción |
 | :--- | :--- | :--- |
@@ -33,7 +33,7 @@ La plataforma utiliza múltiples motores para maximizar el rendimiento:
 | **Autocomplete**| [http://localhost:8081](http://localhost:8081) | Búsqueda vía Redis Sorted Sets. |
 | **Player Info** | [http://localhost:8082](http://localhost:8082) | Información extendida vía Redis. |
 
-## 🛠️ Herramientas de Control
+## Herramientas de Control
 
 Usa los comandos `make` para gestionar el ciclo de vida:
 - `make setup`: Prepara archivos `.env` y modelos de base de datos.
