@@ -51,4 +51,4 @@ EOF
 echo "Sincronizando Redis..."
 docker restart fantasy-world-cup-api
 
-echo "✅ Seeding completado."
+echo "Seeding completado."

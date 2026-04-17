@@ -95,4 +95,4 @@ fi
 echo "--- GENERANDO REPOSITORIO (DOCKER) ---"
 docker run --rm -v "$(pwd):/src" -w /src sqlc/sqlc generate
 
-echo "✅ Portabilidad garantizada."
+echo "Portabilidad garantizada."
