@@ -1,0 +1,31 @@
+version: '3.9'
+
+# This docker-compose file sets up a complete learning environment for:
+# - Redis: In-memory key-value store with advanced data structures
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: kv-lab-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - kv-lab-net
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+# Shared network for inter-service communication
+networks:
+  kv-lab-net:
+    driver: bridge
+
+# Named volumes for data persistence
+volumes:
+  redis-data:
+    driver: local

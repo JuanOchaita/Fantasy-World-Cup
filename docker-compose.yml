@@ -1,0 +1,238 @@
+services:
+  api:
+    build: .
+    container_name: fantasy-world-cup-api
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_URL=postgres://admin:admin@postgres:5432/labdb?sslmode=disable
+      - REDIS_ADDR=redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      search-es-indexer:
+        condition: service_completed_successfully
+      search-redis-migrator:
+        condition: service_completed_successfully
+      search-redis-autocomplete-loader:
+        condition: service_completed_successfully
+    networks:
+      - platform-net
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: db-lab-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: labdb
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+      - ./database/import-data.sql:/docker-entrypoint-initdb.d/2-import-data.sql
+      - ./database/players.csv:/docker-entrypoint-initdb.d/players.csv
+    networks:
+      - platform-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d labdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  elasticsearch:
+    image: elasticsearch:8.13.0
+    container_name: search-lab-elasticsearch
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - platform-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: db-lab-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - platform-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  search-es-indexer:
+    image: golang:1.25-alpine
+    working_dir: /app
+    command: sh -c "go run ./seach-bar/elasticsearch-search-bar/index-players/elasticsearch-indexer.go"
+    environment:
+      - PG_CONN=host=postgres port=5432 user=admin password=admin dbname=labdb sslmode=disable
+      - ES_URL=http://elasticsearch:9200
+      - ES_INDEX=players
+    volumes:
+      - ./:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - platform-net
+    restart: "no"
+
+  search-redis-migrator:
+    image: golang:1.25-alpine
+    working_dir: /app
+    command: sh -c "go run ./seach-bar/redis-players-information/migrate-players.go"
+    environment:
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=admin
+      - PG_PASSWORD=admin
+      - PG_DB=labdb
+      - REDIS_ADDR=redis:6379
+    volumes:
+      - ./:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - platform-net
+    restart: "no"
+
+  search-redis-autocomplete-loader:
+    image: golang:1.25-alpine
+    working_dir: /app
+    command: sh -c "go run ./seach-bar/redis-search-autocomplete/redis-main.go"
+    environment:
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=admin
+      - PG_PASSWORD=admin
+      - PG_DB=labdb
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - platform-net
+    restart: "no"
+
+  search-autocomplete-api:
+    image: golang:1.25-alpine
+    working_dir: /app
+    command: sh -c "go run ./seach-bar/redis-search-autocomplete/redis-search.go"
+    environment:
+      - PORT=8081
+      - REDIS_ADDR=redis:6379
+    volumes:
+      - ./:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      search-redis-autocomplete-loader:
+        condition: service_completed_successfully
+    ports:
+      - "8081:8081"
+    networks:
+      - platform-net
+
+  search-player-info-api:
+    image: golang:1.25-alpine
+    working_dir: /app
+    command: sh -c "go run ./seach-bar/redis-players-information/players-info.go"
+    environment:
+      - PORT=8082
+      - REDIS_ADDR=redis:6379
+    volumes:
+      - ./:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      search-redis-migrator:
+        condition: service_completed_successfully
+    ports:
+      - "8082:8082"
+    networks:
+      - platform-net
+
+  search-elasticsearch-api:
+    image: golang:1.25-alpine
+    working_dir: /app
+    command: sh -c "go run ./seach-bar/elasticsearch-search-bar/serach-bar/elasticsearch-search.go"
+    environment:
+      - PORT=8083
+      - ES_URL=http://elasticsearch:9200
+      - ES_INDEX=players
+    volumes:
+      - ./:/app
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      search-es-indexer:
+        condition: service_completed_successfully
+    ports:
+      - "8083:8083"
+    networks:
+      - platform-net
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app/frontend
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      - VITE_API_PROXY_TARGET=http://api:8080
+    volumes:
+      - ./:/app
+    depends_on:
+      api:
+        condition: service_started
+      search-autocomplete-api:
+        condition: service_started
+      search-player-info-api:
+        condition: service_started
+      search-elasticsearch-api:
+        condition: service_started
+    ports:
+      - "5173:5173"
+    networks:
+      - platform-net
+
+networks:
+  platform-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  elasticsearch-data:
+    driver: local
